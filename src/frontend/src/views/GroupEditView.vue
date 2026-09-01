@@ -7,20 +7,24 @@ import { useRoute, useRouter } from 'vue-router';
 import AlertBanner from '@/components/AlertBanner.vue';
 import AppButton from '@/components/AppButton.vue';
 import AppTextField from '@/components/AppTextField.vue';
-import CommitteeEditor from '@/components/CommitteeEditor.vue';
-import type { CommitteeDraft } from '@/types/CommitteeDraft';
+import NameListEditor from '@/components/NameListEditor.vue';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { GroupFormErrors } from '@/utils/groupFormValidation';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
+import type { NameDraft } from '@/types/NameDraft';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
+import { MemberStatusService } from '@/services/MemberStatusService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { ToastService } from '@/services/ToastService';
 import { hasFormErrors, validateGroupBasics } from '@/utils/groupFormValidation';
 import { resolveErrorMessage } from '@/utils/resolveErrorMessage';
 
 /* Types */
 interface GroupEditForm {
   name: string;
-  committees: CommitteeDraft[];
+  committees: NameDraft[];
+  statuses: NameDraft[];
 }
 
 /* Variables */
@@ -28,7 +32,11 @@ const route = useRoute();
 const router = useRouter();
 
 /* Reactive Variables */
-const form = reactive<GroupEditForm>({ name: '', committees: [{ id: null, name: '' }] });
+const form = reactive<GroupEditForm>({
+  name: '',
+  committees: [{ id: null, name: '' }],
+  statuses: [{ id: null, name: '' }],
+});
 const errors = ref<GroupFormErrors>({});
 const formError = ref<string>('');
 
@@ -37,6 +45,11 @@ const groupId = computed<number>(() => Number(route.params.id));
 const groupExists = computed<boolean>(() => GroupService.getGroupById(groupId.value) !== null);
 
 /* Functions */
+function toDrafts(items: { id: number; name: string }[]): NameDraft[] {
+  const drafts = items.map((item) => ({ id: item.id, name: item.name }));
+  return drafts.length > 0 ? drafts : [{ id: null, name: '' }];
+}
+
 function loadGroup(): void {
   const group = GroupService.getGroupById(groupId.value);
   if (group === null) {
@@ -44,10 +57,17 @@ function loadGroup(): void {
   }
 
   form.name = group.name;
-  const committees = CommitteeService.getCommitteesByGroupId(groupId.value).map(
-    (committee: CommitteeInterface) => ({ id: committee.id, name: committee.name }),
+  form.committees = toDrafts(
+    CommitteeService.getCommitteesByGroupId(groupId.value).map((committee: CommitteeInterface) => ({
+      id: committee.id,
+      name: committee.name,
+    })),
   );
-  form.committees = committees.length > 0 ? committees : [{ id: null, name: '' }];
+  form.statuses = toDrafts(
+    MemberStatusService.getMemberStatusesByGroupId(groupId.value).map(
+      (status: MemberStatusInterface) => ({ id: status.id, name: status.name }),
+    ),
+  );
 }
 
 function handleSubmit(): void {
@@ -55,23 +75,27 @@ function handleSubmit(): void {
 
   errors.value = validateGroupBasics(
     form.name,
-    form.committees.map((draft: CommitteeDraft) => draft.name),
+    form.committees.map((draft: NameDraft) => draft.name),
+    form.statuses.map((draft: NameDraft) => draft.name),
   );
   if (hasFormErrors(errors.value)) {
     return;
   }
 
   try {
-    GroupService.updateGroupWithCommittees(groupId.value, {
+    GroupService.updateGroupDetails(groupId.value, {
       name: form.name,
       committees: form.committees,
+      statuses: form.statuses,
     });
+    ToastService.success('Cambios del grupo guardados.');
     void router.push({
       name: ROUTE_NAMES.ADMIN_GROUP_DETAIL,
       params: { id: String(groupId.value) },
     });
   } catch (error: unknown) {
     formError.value = resolveErrorMessage(error);
+    ToastService.error(formError.value);
   }
 }
 
@@ -108,7 +132,7 @@ loadGroup();
     <div v-else class="rounded-2xl border border-slate-200 bg-white p-8">
       <h2 class="text-xl font-bold text-ink">Editar grupo estudiantil</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Actualiza el nombre del grupo y gestiona sus comités o departamentos.
+        Actualiza el nombre del grupo y gestiona sus comités/departamentos y estados de miembro.
       </p>
 
       <form class="mt-6 space-y-8" @submit.prevent="handleSubmit">
@@ -121,7 +145,20 @@ loadGroup();
             :error="errors.name"
             required
           />
-          <CommitteeEditor v-model="form.committees" :error="errors.committees" />
+          <NameListEditor
+            v-model="form.committees"
+            label="Comités / Departamentos"
+            add-label="Agregar comité"
+            placeholder="Ej: Comité de Comunicaciones"
+            :error="errors.committees"
+          />
+          <NameListEditor
+            v-model="form.statuses"
+            label="Estados de miembro"
+            add-label="Agregar estado"
+            placeholder="Ej: ACTIVO"
+            :error="errors.statuses"
+          />
         </div>
 
         <AlertBanner v-if="formError" type="error" :message="formError" />

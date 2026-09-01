@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* External Imports */
 import { computed, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
 import AppButton from '@/components/AppButton.vue';
@@ -9,34 +9,18 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
 import type { Nullable } from '@/types/Nullable';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
+import { MemberService } from '@/services/MemberService';
+import { MemberStatusService } from '@/services/MemberStatusService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { ToastService } from '@/services/ToastService';
 import { UserService } from '@/services/UserService';
-
-/* Types */
-interface UpcomingModule {
-  icon: string;
-  title: string;
-  description: string;
-}
 
 /* Variables */
 const route = useRoute();
 const router = useRouter();
-
-const upcomingModules: UpcomingModule[] = [
-  {
-    icon: 'fa-database',
-    title: 'Base de datos del grupo',
-    description: 'Registro y gestión de miembros. Disponible en la parte 2.',
-  },
-  {
-    icon: 'fa-list-check',
-    title: 'Tabla de permanencia',
-    description: 'Seguimiento de actividades y porcentajes. Disponible en la parte 3.',
-  },
-];
 
 /* Reactive Variables */
 const isDeleteOpen = ref<boolean>(false);
@@ -47,6 +31,10 @@ const group = computed<Nullable<GroupInterface>>(() => GroupService.getGroupById
 const committees = computed<CommitteeInterface[]>(() =>
   CommitteeService.getCommitteesByGroupId(groupId.value),
 );
+const memberStatuses = computed<MemberStatusInterface[]>(() =>
+  MemberStatusService.getMemberStatusesByGroupId(groupId.value),
+);
+const memberCount = computed<number>(() => MemberService.getMembersByGroupId(groupId.value).length);
 const boardUsername = computed<string>(
   () => UserService.getBoardUserByGroupId(groupId.value)?.username ?? '',
 );
@@ -65,8 +53,10 @@ function goToEdit(): void {
 }
 
 function handleDelete(): void {
+  const groupName = group.value?.name ?? '';
   GroupService.deleteGroup(groupId.value);
   isDeleteOpen.value = false;
+  ToastService.success(`Grupo «${groupName}» eliminado.`);
   void router.push({ name: ROUTE_NAMES.ADMIN_GROUPS });
 }
 </script>
@@ -111,7 +101,7 @@ function handleDelete(): void {
           </div>
         </div>
 
-        <div class="mt-6 grid gap-6 sm:grid-cols-2">
+        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <h3 class="text-sm font-bold text-slate-500">Cuenta de la junta directiva</h3>
             <p class="mt-2 flex items-center gap-2 text-sm text-ink">
@@ -135,24 +125,57 @@ function handleDelete(): void {
               </li>
             </ul>
           </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-500">Estados de miembro</h3>
+            <ul class="mt-2 flex flex-wrap gap-1.5">
+              <li
+                v-for="status in memberStatuses"
+                :key="status.id"
+                class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700"
+              >
+                {{ status.name }}
+              </li>
+              <li v-if="memberStatuses.length === 0" class="text-sm text-slate-400">
+                Sin estados registrados.
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 
       <div class="grid gap-5 sm:grid-cols-2">
-        <div
-          v-for="moduleItem in upcomingModules"
-          :key="moduleItem.title"
-          class="rounded-xl border border-slate-200 bg-slate-50 p-5"
+        <RouterLink
+          :to="{ name: ROUTE_NAMES.ADMIN_GROUP_MEMBERS, params: { id: String(group.id) } }"
+          class="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
         >
+          <div class="flex items-center gap-3">
+            <span
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white"
+            >
+              <i class="fa-solid fa-database" />
+            </span>
+            <p class="text-sm font-bold text-ink">Base de datos del grupo</p>
+          </div>
+          <p class="mt-3 text-sm text-slate-500">
+            {{ memberCount }} integrante(s) registrado(s). Abre la tabla para gestionarlos.
+          </p>
+          <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+            Abrir <i class="fa-solid fa-arrow-right text-xs" />
+          </span>
+        </RouterLink>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
           <div class="flex items-center gap-3">
             <span
               class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-400"
             >
-              <i class="fa-solid" :class="moduleItem.icon" />
+              <i class="fa-solid fa-list-check" />
             </span>
-            <p class="text-sm font-bold text-ink">{{ moduleItem.title }}</p>
+            <p class="text-sm font-bold text-ink">Tabla de permanencia</p>
           </div>
-          <p class="mt-3 text-sm text-slate-500">{{ moduleItem.description }}</p>
+          <p class="mt-3 text-sm text-slate-500">
+            Seguimiento de actividades y porcentajes. Disponible en la parte 3.
+          </p>
           <span
             class="mt-4 inline-block rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-500"
           >

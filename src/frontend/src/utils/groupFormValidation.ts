@@ -3,6 +3,7 @@ import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
 export interface GroupFormErrors {
   name?: string;
   committees?: string;
+  statuses?: string;
 }
 
 export interface RegisterGroupFormErrors extends GroupFormErrors {
@@ -11,18 +12,23 @@ export interface RegisterGroupFormErrors extends GroupFormErrors {
   boardPasswordConfirmation?: string;
 }
 
-export function validateGroupBasics(name: string, committeeNames: string[]): GroupFormErrors {
+export function validateGroupBasics(
+  name: string,
+  committeeNames: string[],
+  statusNames: string[],
+): GroupFormErrors {
   const errors: GroupFormErrors = {};
 
   if (name.trim().length < 3) {
     errors.name = 'El nombre del grupo debe tener al menos 3 caracteres.';
   }
 
-  const filledCommittees = committeeNames.filter(
-    (committeeName: string) => committeeName.trim().length > 0,
-  );
-  if (filledCommittees.length === 0) {
+  if (committeeNames.filter((value: string) => value.trim().length > 0).length === 0) {
     errors.committees = 'Agrega al menos un comité o departamento.';
+  }
+
+  if (statusNames.filter((value: string) => value.trim().length > 0).length === 0) {
+    errors.statuses = 'Agrega al menos un estado de miembro.';
   }
 
   return errors;
@@ -33,7 +39,7 @@ export function validateRegisterGroupForm(
   passwordConfirmation: string,
 ): RegisterGroupFormErrors {
   const errors: RegisterGroupFormErrors = {
-    ...validateGroupBasics(form.name, form.committeeNames),
+    ...validateGroupBasics(form.name, form.committeeNames, form.statusNames),
   };
 
   if (form.boardUsername.trim().length < 4) {

@@ -33,7 +33,10 @@ const navItems = computed<NavItem[]>(() => {
   }
 
   if (session.value?.role === USER_ROLES.BOARD) {
-    return [{ label: 'Mi grupo', icon: 'fa-people-group', routeName: ROUTE_NAMES.BOARD_HOME }];
+    return [
+      { label: 'Mi grupo', icon: 'fa-people-group', routeName: ROUTE_NAMES.BOARD_HOME },
+      { label: 'Base de datos', icon: 'fa-database', routeName: ROUTE_NAMES.BOARD_MEMBERS },
+    ];
   }
 
   return [];

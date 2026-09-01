@@ -1,17 +1,26 @@
 <script setup lang="ts">
 /* Internal Imports */
 import AppButton from '@/components/AppButton.vue';
-import type { CommitteeDraft } from '@/types/CommitteeDraft';
+import type { NameDraft } from '@/types/NameDraft';
 
 /* Props */
-const props = defineProps<{ modelValue: CommitteeDraft[]; error?: string }>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: NameDraft[];
+    label: string;
+    addLabel?: string;
+    placeholder?: string;
+    error?: string;
+  }>(),
+  { addLabel: 'Agregar', placeholder: 'Nombre', error: '' },
+);
 
 /* Emits */
-const emit = defineEmits<{ 'update:modelValue': [value: CommitteeDraft[]] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: NameDraft[]] }>();
 
 /* Functions */
 function updateName(index: number, value: string): void {
-  const next = props.modelValue.map((draft: CommitteeDraft, draftIndex: number) =>
+  const next = props.modelValue.map((draft: NameDraft, draftIndex: number) =>
     draftIndex === index ? { ...draft, name: value } : draft,
   );
   emit('update:modelValue', next);
@@ -28,7 +37,7 @@ function addItem(): void {
 
 function removeItem(index: number): void {
   const next = props.modelValue.filter(
-    (_draft: CommitteeDraft, draftIndex: number) => draftIndex !== index,
+    (_draft: NameDraft, draftIndex: number) => draftIndex !== index,
   );
   emit('update:modelValue', next.length > 0 ? next : [{ id: null, name: '' }]);
 }
@@ -37,14 +46,14 @@ function removeItem(index: number): void {
 <template>
   <div class="space-y-2">
     <label class="block text-sm font-semibold text-slate-700">
-      Comités / Departamentos <span class="text-red-500">*</span>
+      {{ label }} <span class="text-red-500">*</span>
     </label>
 
     <div v-for="(draft, index) in modelValue" :key="index" class="flex items-center gap-2">
       <input
         :value="draft.name"
         type="text"
-        placeholder="Ej: Comité de Comunicaciones"
+        :placeholder="placeholder"
         class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         @input="handleInput(index, $event)"
       />
@@ -62,7 +71,7 @@ function removeItem(index: number): void {
 
     <AppButton variant="secondary" type="button" @click="addItem">
       <i class="fa-solid fa-plus" />
-      Agregar comité
+      {{ addLabel }}
     </AppButton>
   </div>
 </template>

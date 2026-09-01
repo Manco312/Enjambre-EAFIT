@@ -12,6 +12,7 @@ import type { Nullable } from '@/types/Nullable';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { ToastService } from '@/services/ToastService';
 import { UserService } from '@/services/UserService';
 
 /* Types */
@@ -63,7 +64,9 @@ function requestDelete(groupId: number): void {
 
 function confirmDelete(): void {
   if (groupPendingDelete.value !== null) {
+    const groupName = groupPendingDelete.value.name;
     GroupService.deleteGroup(groupPendingDelete.value.id);
+    ToastService.success(`Grupo «${groupName}» eliminado.`);
   }
   groupPendingDelete.value = null;
 }

@@ -11,6 +11,7 @@ import BrandMark from '@/components/BrandMark.vue';
 import type { LoginDTO } from '@/dtos/LoginDTO';
 import { AuthService } from '@/services/AuthService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { ToastService } from '@/services/ToastService';
 import { resolveErrorMessage } from '@/utils/resolveErrorMessage';
 
 /* Variables */
@@ -27,7 +28,8 @@ function handleSubmit(): void {
   isSubmitting.value = true;
 
   try {
-    AuthService.login(credentials);
+    const session = AuthService.login(credentials);
+    ToastService.success(`Sesión iniciada como ${session.username}.`);
     void router.push({ name: AuthService.resolveHomeRouteName() });
   } catch (error: unknown) {
     errorMessage.value = resolveErrorMessage(error);
@@ -84,7 +86,7 @@ function handleSubmit(): void {
             Administrador — usuario: <code>admin</code> / contraseña: <code>admin123</code>
           </p>
           <p>
-            Junta directiva — usuario: <code>junta.semillero</code> / contraseña:
+            Junta directiva — usuario: <code>junta.spie</code> / contraseña:
             <code>junta123</code>
           </p>
         </div>

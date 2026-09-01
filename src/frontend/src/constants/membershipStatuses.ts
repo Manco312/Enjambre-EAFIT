@@ -1,0 +1,7 @@
+export const DEFAULT_MEMBER_STATUS_NAMES: string[] = [
+  'ACTIVO',
+  'PERÍODO DE PRUEBA',
+  'LICENCIA',
+  'HONORARIO',
+  'MIEMBRO DE JUNTA',
+];

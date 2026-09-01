@@ -1,20 +1,33 @@
-import type { CommitteeDraft } from '@/types/CommitteeDraft';
-import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateGroupDTO } from '@/dtos/CreateGroupDTO';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
+import type { NameDraft } from '@/types/NameDraft';
 import type { Nullable } from '@/types/Nullable';
 import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
 import type { UpdateGroupDTO } from '@/dtos/UpdateGroupDTO';
 import { CommitteeService } from '@/services/CommitteeService';
 import { DomainError } from '@/utils/DomainError';
+import { MemberService } from '@/services/MemberService';
+import { MemberStatusService } from '@/services/MemberStatusService';
 import { USER_ROLES } from '@/constants/roles';
 import { UserService } from '@/services/UserService';
 import { generateId } from '@/utils/generateId';
 import { useGroupStore } from '@/stores/groupstore';
 
-export interface UpdateGroupWithCommitteesDTO {
+export interface UpdateGroupDetailsDTO {
   name: string;
-  committees: CommitteeDraft[];
+  committees: NameDraft[];
+  statuses: NameDraft[];
+}
+
+interface NamedEntity {
+  id: number;
+  name: string;
+}
+
+interface ReconcileHandlers {
+  create: (name: string) => void;
+  rename: (id: number, name: string) => void;
+  remove: (id: number) => void;
 }
 
 export class GroupService {
@@ -54,9 +67,13 @@ export class GroupService {
 
     const group = GroupService.createGroup({ name: dto.name });
 
-    GroupService.replaceCommittees(
+    GroupService.applyCommittees(
       group.id,
       dto.committeeNames.map((name: string) => ({ id: null, name })),
+    );
+    GroupService.applyStatuses(
+      group.id,
+      dto.statusNames.map((name: string) => ({ id: null, name })),
     );
 
     UserService.createUser({
@@ -85,12 +102,10 @@ export class GroupService {
     return updated;
   }
 
-  public static updateGroupWithCommittees(
-    id: number,
-    dto: UpdateGroupWithCommitteesDTO,
-  ): GroupInterface {
+  public static updateGroupDetails(id: number, dto: UpdateGroupDetailsDTO): GroupInterface {
     const updated = GroupService.updateGroup(id, { name: dto.name });
-    GroupService.replaceCommittees(id, dto.committees);
+    GroupService.applyCommittees(id, dto.committees);
+    GroupService.applyStatuses(id, dto.statuses);
     return updated;
   }
 
@@ -100,31 +115,65 @@ export class GroupService {
       throw new DomainError('GROUP_NOT_FOUND');
     }
 
+    MemberService.deleteMembersByGroupId(id);
+    MemberStatusService.deleteMemberStatusesByGroupId(id);
     CommitteeService.deleteCommitteesByGroupId(id);
     UserService.deleteBoardUserByGroupId(id);
     useGroupStore().removeGroup(id);
   }
 
-  private static replaceCommittees(groupId: number, drafts: CommitteeDraft[]): void {
+  private static applyCommittees(groupId: number, drafts: NameDraft[]): void {
+    GroupService.reconcile(CommitteeService.getCommitteesByGroupId(groupId), drafts, {
+      create: (name: string) => {
+        CommitteeService.createCommittee({ name, groupId });
+      },
+      rename: (id: number, name: string) => {
+        CommitteeService.updateCommittee(id, { name });
+      },
+      remove: (id: number) => {
+        CommitteeService.deleteCommittee(id);
+      },
+    });
+  }
+
+  private static applyStatuses(groupId: number, drafts: NameDraft[]): void {
+    GroupService.reconcile(MemberStatusService.getMemberStatusesByGroupId(groupId), drafts, {
+      create: (name: string) => {
+        MemberStatusService.createMemberStatus({ name, groupId });
+      },
+      rename: (id: number, name: string) => {
+        MemberStatusService.updateMemberStatus(id, { name });
+      },
+      remove: (id: number) => {
+        MemberStatusService.deleteMemberStatus(id);
+      },
+    });
+  }
+
+  private static reconcile(
+    existing: NamedEntity[],
+    drafts: NameDraft[],
+    handlers: ReconcileHandlers,
+  ): void {
     const cleaned = drafts
-      .map((draft: CommitteeDraft) => ({ id: draft.id, name: draft.name.trim() }))
-      .filter((draft: CommitteeDraft) => draft.name.length > 0);
+      .map((draft: NameDraft) => ({ id: draft.id, name: draft.name.trim() }))
+      .filter((draft: NameDraft) => draft.name.length > 0);
 
     const keptIds = cleaned
-      .map((draft: CommitteeDraft) => draft.id)
+      .map((draft: NameDraft) => draft.id)
       .filter((id: Nullable<number>): id is number => id !== null);
 
-    CommitteeService.getCommitteesByGroupId(groupId)
-      .filter((committee: CommitteeInterface) => !keptIds.includes(committee.id))
-      .forEach((committee: CommitteeInterface) => {
-        CommitteeService.deleteCommittee(committee.id);
+    existing
+      .filter((entity: NamedEntity) => !keptIds.includes(entity.id))
+      .forEach((entity: NamedEntity) => {
+        handlers.remove(entity.id);
       });
 
-    cleaned.forEach((draft: CommitteeDraft) => {
+    cleaned.forEach((draft: NameDraft) => {
       if (draft.id === null) {
-        CommitteeService.createCommittee({ name: draft.name, groupId });
+        handlers.create(draft.name);
       } else {
-        CommitteeService.updateCommittee(draft.id, { name: draft.name });
+        handlers.rename(draft.id, draft.name);
       }
     });
   }

@@ -6,8 +6,10 @@ import { RouterView, useRoute, useRouter } from 'vue-router';
 /* Internal Imports */
 import AppSidebar from '@/components/AppSidebar.vue';
 import AppTopbar from '@/components/AppTopbar.vue';
+import ToastHost from '@/components/ToastHost.vue';
 import { AuthService } from '@/services/AuthService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { ToastService } from '@/services/ToastService';
 
 /* Variables */
 const route = useRoute();
@@ -21,6 +23,7 @@ const showAppChrome = computed<boolean>(
 /* Functions */
 function handleLogout(): void {
   AuthService.logout();
+  ToastService.info('Cerraste sesión.');
   void router.push({ name: ROUTE_NAMES.LOGIN });
 }
 </script>
@@ -37,5 +40,7 @@ function handleLogout(): void {
       </div>
     </div>
     <RouterView v-else />
+
+    <ToastHost />
   </div>
 </template>

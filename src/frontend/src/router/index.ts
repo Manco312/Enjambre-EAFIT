@@ -10,6 +10,7 @@ import GroupEditView from '@/views/GroupEditView.vue';
 import GroupsDashboardView from '@/views/GroupsDashboardView.vue';
 import LandingView from '@/views/LandingView.vue';
 import LoginView from '@/views/LoginView.vue';
+import MembersView from '@/views/MembersView.vue';
 import NotFoundView from '@/views/NotFoundView.vue';
 
 const routes: RouteRecordRaw[] = [
@@ -50,10 +51,22 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Editar grupo estudiantil', requiresAuth: true, roles: [USER_ROLES.ADMIN] },
   },
   {
+    path: '/admin/groups/:id/members',
+    name: ROUTE_NAMES.ADMIN_GROUP_MEMBERS,
+    component: MembersView,
+    meta: { title: 'Base de datos de integrantes', requiresAuth: true, roles: [USER_ROLES.ADMIN] },
+  },
+  {
     path: '/group',
     name: ROUTE_NAMES.BOARD_HOME,
     component: BoardDashboardView,
     meta: { title: 'Mi grupo', requiresAuth: true, roles: [USER_ROLES.BOARD] },
+  },
+  {
+    path: '/group/members',
+    name: ROUTE_NAMES.BOARD_MEMBERS,
+    component: MembersView,
+    meta: { title: 'Base de datos de integrantes', requiresAuth: true, roles: [USER_ROLES.BOARD] },
   },
   {
     path: '/:pathMatch(.*)*',

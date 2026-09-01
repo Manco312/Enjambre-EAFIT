@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* External Imports */
 import { computed } from 'vue';
+import { RouterLink } from 'vue-router';
 
 /* Internal Imports */
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
@@ -9,27 +10,8 @@ import type { Nullable } from '@/types/Nullable';
 import { AuthService } from '@/services/AuthService';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
-
-/* Types */
-interface UpcomingModule {
-  icon: string;
-  title: string;
-  description: string;
-}
-
-/* Variables */
-const upcomingModules: UpcomingModule[] = [
-  {
-    icon: 'fa-database',
-    title: 'Base de datos',
-    description: 'Registra y actualiza los miembros de tu grupo. Disponible en la parte 2.',
-  },
-  {
-    icon: 'fa-list-check',
-    title: 'Tabla de permanencia',
-    description: 'Gestiona actividades y porcentajes de participación. Disponible en la parte 3.',
-  },
-];
+import { MemberService } from '@/services/MemberService';
+import { ROUTE_NAMES } from '@/constants/routeNames';
 
 /* Selectors */
 const groupId = computed<Nullable<number>>(() => AuthService.getSession()?.groupId ?? null);
@@ -38,6 +20,9 @@ const group = computed<Nullable<GroupInterface>>(() =>
 );
 const committees = computed<CommitteeInterface[]>(() =>
   groupId.value === null ? [] : CommitteeService.getCommitteesByGroupId(groupId.value),
+);
+const memberCount = computed<number>(() =>
+  groupId.value === null ? 0 : MemberService.getMembersByGroupId(groupId.value).length,
 );
 </script>
 
@@ -67,20 +52,38 @@ const committees = computed<CommitteeInterface[]>(() =>
     </div>
 
     <div class="grid gap-5 sm:grid-cols-2">
-      <div
-        v-for="moduleItem in upcomingModules"
-        :key="moduleItem.title"
-        class="rounded-xl border border-slate-200 bg-slate-50 p-5"
+      <RouterLink
+        :to="{ name: ROUTE_NAMES.BOARD_MEMBERS }"
+        class="group rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
       >
+        <div class="flex items-center gap-3">
+          <span
+            class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white"
+          >
+            <i class="fa-solid fa-database" />
+          </span>
+          <p class="text-sm font-bold text-ink">Base de datos</p>
+        </div>
+        <p class="mt-3 text-sm text-slate-500">
+          {{ memberCount }} integrante(s) registrado(s). Gestiona la base de datos de tu grupo.
+        </p>
+        <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+          Abrir <i class="fa-solid fa-arrow-right text-xs" />
+        </span>
+      </RouterLink>
+
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
         <div class="flex items-center gap-3">
           <span
             class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-400"
           >
-            <i class="fa-solid" :class="moduleItem.icon" />
+            <i class="fa-solid fa-list-check" />
           </span>
-          <p class="text-sm font-bold text-ink">{{ moduleItem.title }}</p>
+          <p class="text-sm font-bold text-ink">Tabla de permanencia</p>
         </div>
-        <p class="mt-3 text-sm text-slate-500">{{ moduleItem.description }}</p>
+        <p class="mt-3 text-sm text-slate-500">
+          Gestiona actividades y porcentajes de participación. Disponible en la parte 3.
+        </p>
         <span
           class="mt-4 inline-block rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-500"
         >
