@@ -1,5 +1,6 @@
 import type { CreateGroupDTO } from '@/dtos/CreateGroupDTO';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
+import type { MemberStatusDraft } from '@/types/MemberStatusDraft';
 import type { NameDraft } from '@/types/NameDraft';
 import type { Nullable } from '@/types/Nullable';
 import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
@@ -8,15 +9,18 @@ import { CommitteeService } from '@/services/CommitteeService';
 import { DomainError } from '@/utils/DomainError';
 import { MemberService } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
+import { PermanenceActivityService } from '@/services/PermanenceActivityService';
+import { PermanenceTargetService } from '@/services/PermanenceTargetService';
 import { USER_ROLES } from '@/constants/roles';
 import { UserService } from '@/services/UserService';
+import { clampPercentage } from '@/utils/clampPercentage';
 import { generateId } from '@/utils/generateId';
 import { useGroupStore } from '@/stores/groupstore';
 
 export interface UpdateGroupDetailsDTO {
   name: string;
   committees: NameDraft[];
-  statuses: NameDraft[];
+  statuses: MemberStatusDraft[];
 }
 
 interface NamedEntity {
@@ -73,7 +77,11 @@ export class GroupService {
     );
     GroupService.applyStatuses(
       group.id,
-      dto.statusNames.map((name: string) => ({ id: null, name })),
+      dto.statuses.map((status) => ({
+        id: null,
+        name: status.name,
+        percentage: status.percentage,
+      })),
     );
 
     UserService.createUser({
@@ -115,6 +123,8 @@ export class GroupService {
       throw new DomainError('GROUP_NOT_FOUND');
     }
 
+    PermanenceActivityService.deleteActivitiesByGroupId(id);
+    PermanenceTargetService.deleteTargetsByGroupId(id);
     MemberService.deleteMembersByGroupId(id);
     MemberStatusService.deleteMemberStatusesByGroupId(id);
     CommitteeService.deleteCommitteesByGroupId(id);
@@ -131,22 +141,40 @@ export class GroupService {
         CommitteeService.updateCommittee(id, { name });
       },
       remove: (id: number) => {
+        PermanenceActivityService.deleteActivitiesByCommitteeId(id);
         CommitteeService.deleteCommittee(id);
       },
     });
   }
 
-  private static applyStatuses(groupId: number, drafts: NameDraft[]): void {
-    GroupService.reconcile(MemberStatusService.getMemberStatusesByGroupId(groupId), drafts, {
-      create: (name: string) => {
-        MemberStatusService.createMemberStatus({ name, groupId });
-      },
-      rename: (id: number, name: string) => {
-        MemberStatusService.updateMemberStatus(id, { name });
-      },
-      remove: (id: number) => {
-        MemberStatusService.deleteMemberStatus(id);
-      },
+  private static applyStatuses(groupId: number, drafts: MemberStatusDraft[]): void {
+    const cleaned = drafts
+      .map((draft: MemberStatusDraft) => ({
+        id: draft.id,
+        name: draft.name.trim(),
+        percentage: clampPercentage(draft.percentage),
+      }))
+      .filter((draft) => draft.name.length > 0);
+
+    const keptIds = cleaned
+      .map((draft) => draft.id)
+      .filter((id: Nullable<number>): id is number => id !== null);
+
+    MemberStatusService.getMemberStatusesByGroupId(groupId)
+      .filter((status) => !keptIds.includes(status.id))
+      .forEach((status) => {
+        PermanenceTargetService.deleteTargetByMemberStatusId(status.id);
+        MemberStatusService.deleteMemberStatus(status.id);
+      });
+
+    cleaned.forEach((draft) => {
+      if (draft.id === null) {
+        const status = MemberStatusService.createMemberStatus({ name: draft.name, groupId });
+        PermanenceTargetService.upsertForMemberStatus(groupId, status.id, draft.percentage);
+      } else {
+        MemberStatusService.updateMemberStatus(draft.id, { name: draft.name });
+        PermanenceTargetService.upsertForMemberStatus(groupId, draft.id, draft.percentage);
+      }
     });
   }
 

@@ -7,10 +7,12 @@ import { useRouter } from 'vue-router';
 import AlertBanner from '@/components/AlertBanner.vue';
 import AppButton from '@/components/AppButton.vue';
 import AppTextField from '@/components/AppTextField.vue';
+import MemberStatusEditor from '@/components/MemberStatusEditor.vue';
 import NameListEditor from '@/components/NameListEditor.vue';
+import type { MemberStatusDraft } from '@/types/MemberStatusDraft';
 import type { NameDraft } from '@/types/NameDraft';
 import type { RegisterGroupFormErrors } from '@/utils/groupFormValidation';
-import { DEFAULT_MEMBER_STATUS_NAMES } from '@/constants/membershipStatuses';
+import { DEFAULT_MEMBER_STATUSES } from '@/constants/membershipStatuses';
 import { GroupService } from '@/services/GroupService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
@@ -22,7 +24,7 @@ import { slugify } from '@/utils/slugify';
 interface GroupCreateForm {
   name: string;
   committees: NameDraft[];
-  statuses: NameDraft[];
+  statuses: MemberStatusDraft[];
   boardUsername: string;
   boardPassword: string;
   boardPasswordConfirmation: string;
@@ -35,7 +37,11 @@ const router = useRouter();
 const form = reactive<GroupCreateForm>({
   name: '',
   committees: [{ id: null, name: '' }],
-  statuses: DEFAULT_MEMBER_STATUS_NAMES.map((name: string) => ({ id: null, name })),
+  statuses: DEFAULT_MEMBER_STATUSES.map((status) => ({
+    id: null,
+    name: status.name,
+    percentage: status.percentage,
+  })),
   boardUsername: '',
   boardPassword: '',
   boardPasswordConfirmation: '',
@@ -63,12 +69,15 @@ function handleSubmit(): void {
   const payload = {
     name: form.name,
     committeeNames: form.committees.map((draft: NameDraft) => draft.name),
-    statusNames: form.statuses.map((draft: NameDraft) => draft.name),
+    statuses: form.statuses.map((draft: MemberStatusDraft) => ({
+      name: draft.name,
+      percentage: draft.percentage,
+    })),
     boardUsername: form.boardUsername,
     boardPassword: form.boardPassword,
   };
 
-  errors.value = validateRegisterGroupForm(payload, form.boardPasswordConfirmation);
+  errors.value = validateRegisterGroupForm(payload, form.statuses, form.boardPasswordConfirmation);
   if (hasFormErrors(errors.value)) {
     return;
   }
@@ -102,8 +111,8 @@ function goBack(): void {
     <div class="rounded-2xl border border-slate-200 bg-white p-8">
       <h2 class="text-xl font-bold text-ink">Crear grupo estudiantil</h2>
       <p class="mt-1 text-sm text-slate-500">
-        Registra el grupo, sus comités o departamentos, los estados de miembro y la cuenta de su
-        junta directiva.
+        Registra el grupo, sus comités o departamentos, los estados de miembro con su porcentaje de
+        permanencia y la cuenta de su junta directiva.
       </p>
 
       <form class="mt-6 space-y-8" @submit.prevent="handleSubmit">
@@ -124,13 +133,7 @@ function goBack(): void {
             placeholder="Ej: Comité de Comunicaciones"
             :error="errors.committees"
           />
-          <NameListEditor
-            v-model="form.statuses"
-            label="Estados de miembro"
-            add-label="Agregar estado"
-            placeholder="Ej: ACTIVO"
-            :error="errors.statuses"
-          />
+          <MemberStatusEditor v-model="form.statuses" :error="errors.statuses" />
         </div>
 
         <div class="space-y-4 border-t border-slate-100 pt-6">

@@ -1,6 +1,10 @@
 import type { MemberInterface } from '@/interfaces/MemberInterface';
+import type { PermanenceRow, PermanenceSheetOption } from '@/services/PermanenceService';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
 import { MemberService } from '@/services/MemberService';
+import { PermanenceService } from '@/services/PermanenceService';
+
+type CellValue = string | number;
 
 export class ExcelExportService {
   public static async buildMembersBlob(
@@ -14,20 +18,65 @@ export class ExcelExportService {
       MEMBER_COLUMNS.map((column) => MemberService.fieldToText(member, column.key)),
     );
 
+    const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet([header, ...body]);
     worksheet['!cols'] = MEMBER_COLUMNS.map(() => ({ wch: 26 }));
-
-    const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, ExcelExportService.safeSheetName(sheetName));
 
-    const output = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-    return new Blob([output], {
+    return ExcelExportService.toBlob(XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }));
+  }
+
+  public static async buildPermanenceBlob(groupId: number): Promise<Blob> {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.utils.book_new();
+
+    PermanenceService.getSheetOptions(groupId).forEach((option: PermanenceSheetOption) => {
+      const sheet = PermanenceService.buildSheet(groupId, option.key);
+
+      const header: CellValue[] = ['Integrante', 'Estado'];
+      sheet.activityColumns.forEach((activity) => {
+        header.push(`${activity.name} (${activity.weight}%)`);
+      });
+      sheet.subtotalColumns.forEach((subtotal) => {
+        header.push(`${subtotal.committeeName} (subtotal)`);
+      });
+      header.push('Puntaje %', 'Objetivo %', 'Cumple');
+
+      const body: CellValue[][] = sheet.rows.map((row: PermanenceRow) => {
+        const cells: CellValue[] = [
+          row.member.name || row.member.email || 'Sin nombre',
+          row.statusLabel,
+        ];
+        sheet.activityColumns.forEach((activity) => {
+          cells.push(row.values[activity.id] ?? 0);
+        });
+        sheet.subtotalColumns.forEach((subtotal) => {
+          cells.push(Math.round(row.subtotals[subtotal.committeeId] ?? 0));
+        });
+        cells.push(Math.round(row.score), row.target, row.meets ? 'Sí' : 'No');
+        return cells;
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet([header, ...body]);
+      worksheet['!cols'] = header.map((_value, index) => ({ wch: index < 2 ? 28 : 16 }));
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        ExcelExportService.safeSheetName(option.label),
+      );
+    });
+
+    return ExcelExportService.toBlob(XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }));
+  }
+
+  private static toBlob(output: unknown): Blob {
+    return new Blob([output as ArrayBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
   }
 
   private static safeSheetName(name: string): string {
     const sanitized = name.replace(/[\\/?*[\]:]/g, ' ').trim();
-    return sanitized.length > 0 ? sanitized.slice(0, 31) : 'Miembros';
+    return sanitized.length > 0 ? sanitized.slice(0, 31) : 'Hoja';
   }
 }

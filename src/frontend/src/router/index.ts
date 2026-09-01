@@ -12,6 +12,7 @@ import LandingView from '@/views/LandingView.vue';
 import LoginView from '@/views/LoginView.vue';
 import MembersView from '@/views/MembersView.vue';
 import NotFoundView from '@/views/NotFoundView.vue';
+import PermanenceView from '@/views/PermanenceView.vue';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -57,6 +58,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Base de datos de integrantes', requiresAuth: true, roles: [USER_ROLES.ADMIN] },
   },
   {
+    path: '/admin/groups/:id/permanence',
+    name: ROUTE_NAMES.ADMIN_GROUP_PERMANENCE,
+    component: PermanenceView,
+    meta: { title: 'Tabla de permanencia', requiresAuth: true, roles: [USER_ROLES.ADMIN] },
+  },
+  {
     path: '/group',
     name: ROUTE_NAMES.BOARD_HOME,
     component: BoardDashboardView,
@@ -67,6 +74,12 @@ const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.BOARD_MEMBERS,
     component: MembersView,
     meta: { title: 'Base de datos de integrantes', requiresAuth: true, roles: [USER_ROLES.BOARD] },
+  },
+  {
+    path: '/group/permanence',
+    name: ROUTE_NAMES.BOARD_PERMANENCE,
+    component: PermanenceView,
+    meta: { title: 'Tabla de permanencia', requiresAuth: true, roles: [USER_ROLES.BOARD] },
   },
   {
     path: '/:pathMatch(.*)*',

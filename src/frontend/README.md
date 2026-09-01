@@ -20,7 +20,7 @@ App disponible en `http://localhost:5173`.
 | Rol | Usuario | Contraseña |
 |-----|---------|------------|
 | Administrador | `admin` | `admin123` |
-| Junta directiva | `junta.semillero` | `junta123` |
+| Junta directiva | `junta.spie` | `junta123` |
 
 ## Scripts
 

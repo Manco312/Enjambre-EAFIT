@@ -36,6 +36,7 @@ const navItems = computed<NavItem[]>(() => {
     return [
       { label: 'Mi grupo', icon: 'fa-people-group', routeName: ROUTE_NAMES.BOARD_HOME },
       { label: 'Base de datos', icon: 'fa-database', routeName: ROUTE_NAMES.BOARD_MEMBERS },
+      { label: 'Permanencia', icon: 'fa-list-check', routeName: ROUTE_NAMES.BOARD_PERMANENCE },
     ];
   }
 

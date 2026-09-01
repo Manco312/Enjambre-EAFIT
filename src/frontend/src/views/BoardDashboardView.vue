@@ -72,24 +72,25 @@ const memberCount = computed<number>(() =>
         </span>
       </RouterLink>
 
-      <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <RouterLink
+        :to="{ name: ROUTE_NAMES.BOARD_PERMANENCE }"
+        class="group rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
+      >
         <div class="flex items-center gap-3">
           <span
-            class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-400"
+            class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white"
           >
             <i class="fa-solid fa-list-check" />
           </span>
           <p class="text-sm font-bold text-ink">Tabla de permanencia</p>
         </div>
         <p class="mt-3 text-sm text-slate-500">
-          Gestiona actividades y porcentajes de participación. Disponible en la parte 3.
+          Hoja general y por comité. Registra actividades y valores de cada integrante.
         </p>
-        <span
-          class="mt-4 inline-block rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-500"
-        >
-          Próximamente
+        <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+          Abrir <i class="fa-solid fa-arrow-right text-xs" />
         </span>
-      </div>
+      </RouterLink>
     </div>
   </section>
 </template>

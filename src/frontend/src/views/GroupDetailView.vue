@@ -14,9 +14,17 @@ import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
 import { MemberService } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
+import { PermanenceTargetService } from '@/services/PermanenceTargetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { UserService } from '@/services/UserService';
+
+/* Types */
+interface StatusWithTarget {
+  id: number;
+  name: string;
+  percentage: number;
+}
 
 /* Variables */
 const route = useRoute();
@@ -31,8 +39,14 @@ const group = computed<Nullable<GroupInterface>>(() => GroupService.getGroupById
 const committees = computed<CommitteeInterface[]>(() =>
   CommitteeService.getCommitteesByGroupId(groupId.value),
 );
-const memberStatuses = computed<MemberStatusInterface[]>(() =>
-  MemberStatusService.getMemberStatusesByGroupId(groupId.value),
+const memberStatuses = computed<StatusWithTarget[]>(() =>
+  MemberStatusService.getMemberStatusesByGroupId(groupId.value).map(
+    (status: MemberStatusInterface) => ({
+      id: status.id,
+      name: status.name,
+      percentage: PermanenceTargetService.getTargetByMemberStatusId(status.id)?.percentage ?? 0,
+    }),
+  ),
 );
 const memberCount = computed<number>(() => MemberService.getMembersByGroupId(groupId.value).length);
 const boardUsername = computed<string>(
@@ -126,14 +140,14 @@ function handleDelete(): void {
             </ul>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-slate-500">Estados de miembro</h3>
+            <h3 class="text-sm font-bold text-slate-500">Estados de miembro (% permanencia)</h3>
             <ul class="mt-2 flex flex-wrap gap-1.5">
               <li
                 v-for="status in memberStatuses"
                 :key="status.id"
                 class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700"
               >
-                {{ status.name }}
+                {{ status.name }} · {{ status.percentage }}%
               </li>
               <li v-if="memberStatuses.length === 0" class="text-sm text-slate-400">
                 Sin estados registrados.
@@ -164,24 +178,26 @@ function handleDelete(): void {
           </span>
         </RouterLink>
 
-        <div class="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <RouterLink
+          :to="{ name: ROUTE_NAMES.ADMIN_GROUP_PERMANENCE, params: { id: String(group.id) } }"
+          class="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
+        >
           <div class="flex items-center gap-3">
             <span
-              class="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-400"
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white"
             >
               <i class="fa-solid fa-list-check" />
             </span>
             <p class="text-sm font-bold text-ink">Tabla de permanencia</p>
           </div>
           <p class="mt-3 text-sm text-slate-500">
-            Seguimiento de actividades y porcentajes. Disponible en la parte 3.
+            Hoja general y por comité. Registra actividades y valores; verde/rojo según el objetivo
+            de cada estado.
           </p>
-          <span
-            class="mt-4 inline-block rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-500"
-          >
-            Próximamente
+          <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+            Abrir <i class="fa-solid fa-arrow-right text-xs" />
           </span>
-        </div>
+        </RouterLink>
       </div>
 
       <ConfirmDialog

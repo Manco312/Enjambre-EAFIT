@@ -3,6 +3,7 @@ import type { MemberInterface } from '@/interfaces/MemberInterface';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { DOCUMENT_TYPES } from '@/constants/documentTypes';
+import { PermanenceRecordService } from '@/services/PermanenceRecordService';
 import { generateId } from '@/utils/generateId';
 import { useMemberStore } from '@/stores/memberstore';
 
@@ -61,6 +62,7 @@ export class MemberService {
   }
 
   public static deleteMember(id: number): void {
+    PermanenceRecordService.deleteRecordsByMemberId(id);
     useMemberStore().removeMember(id);
   }
 

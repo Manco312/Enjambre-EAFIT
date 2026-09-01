@@ -1,3 +1,4 @@
+import type { MemberStatusDraft } from '@/types/MemberStatusDraft';
 import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
 
 export interface GroupFormErrors {
@@ -15,7 +16,7 @@ export interface RegisterGroupFormErrors extends GroupFormErrors {
 export function validateGroupBasics(
   name: string,
   committeeNames: string[],
-  statusNames: string[],
+  statuses: MemberStatusDraft[],
 ): GroupFormErrors {
   const errors: GroupFormErrors = {};
 
@@ -27,8 +28,18 @@ export function validateGroupBasics(
     errors.committees = 'Agrega al menos un comité o departamento.';
   }
 
-  if (statusNames.filter((value: string) => value.trim().length > 0).length === 0) {
-    errors.statuses = 'Agrega al menos un estado de miembro.';
+  const namedStatuses = statuses.filter(
+    (status: MemberStatusDraft) => status.name.trim().length > 0,
+  );
+  if (namedStatuses.length === 0) {
+    errors.statuses = 'Agrega al menos un estado de miembro con su porcentaje de permanencia.';
+  } else if (
+    namedStatuses.some(
+      (status: MemberStatusDraft) =>
+        Number.isNaN(status.percentage) || status.percentage < 0 || status.percentage > 100,
+    )
+  ) {
+    errors.statuses = 'Cada porcentaje de permanencia debe estar entre 0 y 100.';
   }
 
   return errors;
@@ -36,10 +47,11 @@ export function validateGroupBasics(
 
 export function validateRegisterGroupForm(
   form: RegisterGroupDTO,
+  statuses: MemberStatusDraft[],
   passwordConfirmation: string,
 ): RegisterGroupFormErrors {
   const errors: RegisterGroupFormErrors = {
-    ...validateGroupBasics(form.name, form.committeeNames, form.statusNames),
+    ...validateGroupBasics(form.name, form.committeeNames, statuses),
   };
 
   if (form.boardUsername.trim().length < 4) {

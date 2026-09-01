@@ -6,6 +6,9 @@ import { committeeSeeder } from '@/seeders/committeeseeder';
 import { groupSeeder } from '@/seeders/groupseeder';
 import { memberSeeder } from '@/seeders/memberseeder';
 import { memberStatusSeeder } from '@/seeders/memberstatusseeder';
+import { permanenceActivitySeeder } from '@/seeders/permanenceactivityseeder';
+import { permanenceRecordSeeder } from '@/seeders/permanencerecordseeder';
+import { permanenceTargetSeeder } from '@/seeders/permanencetargetseeder';
 import { userSeeder } from '@/seeders/userseeder';
 
 type PiniaState = Record<string, StateTree>;
@@ -62,6 +65,15 @@ export default class PiniaConfig {
           membershipStatus: [...member.membershipStatus],
           areas: [...member.areas],
         })),
+      },
+      permanenceTarget: {
+        targets: permanenceTargetSeeder.map((target) => ({ ...target })),
+      },
+      permanenceActivity: {
+        activities: permanenceActivitySeeder.map((activity) => ({ ...activity })),
+      },
+      permanenceRecord: {
+        records: permanenceRecordSeeder.map((record) => ({ ...record })),
       },
     };
   }
