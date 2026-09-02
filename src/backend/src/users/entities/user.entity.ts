@@ -1,19 +1,21 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn } from 'typeorm';
 
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  title: string;
+  @Column({ unique: true })
+  username: string;
 
   @Column()
-  category: string;
+  password: string;
 
   @Column()
-  price: number;
+  role: string;
 
-  @Column()
-  stock: number;
+  /*
+  @OneToOne(() => Member, member => member.user)
+  member: Member | null;
+  */
 }
