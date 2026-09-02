@@ -2,8 +2,9 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
-  //OneToOne,
+  OneToOne,
 } from 'typeorm';
+import { Member } from '../../members/entities/member.entity.js';
 
 @Entity()
 export class User {
@@ -19,8 +20,6 @@ export class User {
   @Column()
   role: string;
 
-  /*
-  @OneToOne(() => Member, member => member.user)
+  @OneToOne('Member', 'user', { nullable: true })
   member: Member | null;
-  */
 }
