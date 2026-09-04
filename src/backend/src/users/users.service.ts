@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
+import bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -22,18 +23,23 @@ export class UsersService {
       throw new BadRequestException('Este nombre de usuario ya está en uso.');
     }
 
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
     const user = this.usersRepository.create({
       ...createUserDto,
-      role: 'user',
+      password: hashedPassword,
+      role: 'board',
     });
 
     return await this.usersRepository.save(user);
   }
 
   async createAdmin(): Promise<User> {
+    const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD!, 10);
+
     const admin = this.usersRepository.create({
       username: process.env.ADMIN_USERNAME,
-      password: process.env.ADMIN_PASSWORD,
+      password: hashedPassword,
       role: 'admin',
     });
 

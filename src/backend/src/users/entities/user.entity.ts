@@ -2,10 +2,12 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
-  //OneToOne,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Group } from '../../groups/entities/group.entity.js';
 
-@Entity()
+@Entity('user')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -19,8 +21,7 @@ export class User {
   @Column()
   role: string;
 
-  /*
-  @OneToOne(() => Member, member => member.user)
-  member: Member | null;
-  */
+  @OneToOne('Group', 'user', { nullable: true })
+  @JoinColumn({ name: 'id_group' })
+  group: Group | null;
 }
