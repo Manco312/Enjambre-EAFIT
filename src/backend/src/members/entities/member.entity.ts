@@ -1,13 +1,13 @@
 import {
   Column,
   Entity,
-  JoinColumn,
-  OneToOne,
   OneToMany,
+  ManyToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity.js';
 import { GroupMember } from '../../groups/entities/group-member.entity.js';
+import { Committee } from '../../committees/entities/committee.entity.js';
+import { Permanence } from '../../permanences/entities/permanence.entity.js';
 
 @Entity('member')
 export class Member {
@@ -17,8 +17,13 @@ export class Member {
   @Column({ name: 'id_epik' })
   idEpik: number;
 
-  @Column()
-  name: string;
+  @Column({
+    transformer: {
+      to: (value: string) => value?.trim().toUpperCase(),
+      from: (value: string) => value,
+    },
+  })
+  fullName: string;
 
   @Column({ name: 'document_type' })
   documentType: string;
@@ -26,7 +31,12 @@ export class Member {
   @Column({ name: 'document_number' })
   documentNumber: string;
 
-  @Column()
+  @Column({
+    transformer: {
+      to: (value: string) => value?.trim().toUpperCase(),
+      from: (value: string) => value,
+    },
+  })
   email: string;
 
   @Column()
@@ -38,10 +48,12 @@ export class Member {
   @Column({ name: 'second_program' })
   secondProgram: string;
 
-  @OneToOne('User', 'member', { nullable: true })
-  @JoinColumn({ name: 'user_id' })
-  user: User | null;
-
   @OneToMany('GroupMember', 'member')
-  groupMemberships: GroupMember[];
+  groupMembers: GroupMember[];
+
+  @ManyToMany('Committee', 'members')
+  committees: Committee[];
+
+  @OneToMany('Permanence', 'member')
+  permanences: Permanence[];
 }

@@ -3,10 +3,11 @@ import {
   Column,
   PrimaryGeneratedColumn,
   OneToOne,
+  JoinColumn,
 } from 'typeorm';
-import { Member } from '../../members/entities/member.entity.js';
+import { Group } from '../../groups/entities/group.entity.js';
 
-@Entity()
+@Entity('user')
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -20,6 +21,7 @@ export class User {
   @Column()
   role: string;
 
-  @OneToOne('Member', 'user', { nullable: true })
-  member: Member | null;
+  @OneToOne('Group', 'user', { nullable: true })
+  @JoinColumn({ name: 'id_group' })
+  group: Group | null;
 }

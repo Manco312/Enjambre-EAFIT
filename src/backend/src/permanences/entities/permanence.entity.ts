@@ -6,23 +6,23 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { GroupMember } from '../../groups/entities/group-member.entity.js';
+import { Member } from '../../members/entities/member.entity.js';
 import { Activity } from '../../activities/entities/activity.entity.js';
 
 @Entity('permanence')
-@Unique(['groupMember', 'activity'])
+@Unique(['member', 'activity'])
 export class Permanence {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne('GroupMember', 'permanences', { nullable: false })
-  @JoinColumn({ name: 'id_group_member' })
-  groupMember: GroupMember;
-
-  @ManyToOne('Activity', 'permanences', { nullable: false })
-  @JoinColumn({ name: 'id_activity' })
-  activity: Activity;
-
   @Column()
   percentage: number;
+
+  @ManyToOne('Member', 'permanences')
+  @JoinColumn({ name: 'id_member' })
+  member: Member;
+
+  @ManyToOne('Activity', 'permanences')
+  @JoinColumn({ name: 'id_activity' })
+  activity: Activity;
 }
