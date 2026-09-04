@@ -16,6 +16,7 @@ export class UsersService {
     return await this.usersRepository.findOneBy({ username });
   }
 
+  /*
   async create(createUserDto: CreateUserDto): Promise<User> {
     const existingUser = await this.findOne(createUserDto.username);
 
@@ -45,4 +46,5 @@ export class UsersService {
 
     return await this.usersRepository.save(admin);
   }
+  */
 }
