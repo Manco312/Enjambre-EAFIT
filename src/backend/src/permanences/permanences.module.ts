@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { PermanencesService } from './permanences.service.js';
+import { PermanencesController } from './permanences.controller.js';
 
-@Module({})
+@Module({
+  providers: [PermanencesService],
+  controllers: [PermanencesController]
+})
 export class PermanencesModule {}

@@ -40,15 +40,7 @@ export class ActivitiesService {
 
   async remove(id: number): Promise<void> {
     const activity = await this.findById(id);
-    
+
     await this.activitiesRepository.remove(activity);
   }
-
-  /*
-  async findByGroupId(groupId: number): Promise<Activity[]> {
-    return await this.activitiesRepository.find({
-      where: { group: { id: groupId }},
-    })
-  }
-  */
 }
