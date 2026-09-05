@@ -7,26 +7,43 @@ import AlertBanner from '@/components/AlertBanner.vue';
 import AppButton from '@/components/AppButton.vue';
 import AppTextField from '@/components/AppTextField.vue';
 import MultiSelect from '@/components/MultiSelect.vue';
+import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateMemberDTO } from '@/dtos/CreateMemberDTO';
+import type { DocumentType } from '@/types/DocumentType';
 import type { MemberFormErrors } from '@/utils/memberFormValidation';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
+import type { Nullable } from '@/types/Nullable';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
 import { hasMemberFormErrors, validateMemberForm } from '@/utils/memberFormValidation';
+
+/* Types */
+interface MemberModalForm {
+  email: string;
+  idEpik: string;
+  fullName: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  phone: string;
+  program: string;
+  secondProgram: string;
+  memberStatusId: Nullable<number>;
+  committeeNames: string[];
+}
 
 /* Props */
 const props = defineProps<{
   open: boolean;
   groupId: number;
-  areaOptions: string[];
-  statusOptions: string[];
+  committees: CommitteeInterface[];
+  statuses: MemberStatusInterface[];
 }>();
 
 /* Emits */
 const emit = defineEmits<{ submit: [dto: CreateMemberDTO]; close: [] }>();
 
 /* Reactive Variables */
-const form = reactive<CreateMemberDTO>(buildEmptyForm(props.groupId));
+const form = reactive<MemberModalForm>(buildEmptyForm());
 const errors = ref<MemberFormErrors>({});
-const lastAutoUppercase = ref<string>('');
 
 /* Watchers */
 watch(
@@ -38,47 +55,65 @@ watch(
   },
 );
 
-watch(
-  () => form.email,
-  (email: string): void => {
-    if (form.emailUppercase === '' || form.emailUppercase === lastAutoUppercase.value) {
-      form.emailUppercase = email.toUpperCase();
-    }
-    lastAutoUppercase.value = email.toUpperCase();
-  },
-);
-
 /* Functions */
-function buildEmptyForm(groupId: number): CreateMemberDTO {
+function buildEmptyForm(): MemberModalForm {
   return {
-    groupId,
     email: '',
-    name: '',
-    epikId: '',
+    idEpik: '',
     fullName: '',
     documentType: DOCUMENT_TYPES.CC,
     documentNumber: '',
-    emailUppercase: '',
     phone: '',
     program: '',
     secondProgram: '',
-    membershipStatus: [],
-    areas: [],
+    memberStatusId: null,
+    committeeNames: [],
   };
 }
 
 function resetForm(): void {
-  Object.assign(form, buildEmptyForm(props.groupId));
+  Object.assign(form, buildEmptyForm());
   errors.value = {};
-  lastAutoUppercase.value = '';
+}
+
+function onStatusChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  form.memberStatusId = value === '' ? null : Number(value);
+}
+
+function committeeIdsFromNames(names: string[]): number[] {
+  return props.committees
+    .filter((committee: CommitteeInterface) => names.includes(committee.name))
+    .map((committee: CommitteeInterface) => committee.id);
 }
 
 function handleSubmit(): void {
-  errors.value = validateMemberForm(form);
-  if (hasMemberFormErrors(errors.value)) {
+  errors.value = validateMemberForm({
+    email: form.email,
+    idEpik: form.idEpik,
+    fullName: form.fullName,
+    documentNumber: form.documentNumber,
+    phone: form.phone,
+    program: form.program,
+    memberStatusId: form.memberStatusId,
+  });
+  if (hasMemberFormErrors(errors.value) || form.memberStatusId === null) {
     return;
   }
-  emit('submit', { ...form });
+
+  emit('submit', {
+    groupId: props.groupId,
+    memberStatusId: form.memberStatusId,
+    idEpik: Number(form.idEpik),
+    fullName: form.fullName.trim(),
+    documentType: form.documentType,
+    documentNumber: form.documentNumber.trim(),
+    email: form.email.trim(),
+    phone: form.phone.trim(),
+    program: form.program.trim(),
+    secondProgram: form.secondProgram.trim(),
+    committeeIds: committeeIdsFromNames(form.committeeNames),
+  });
 }
 
 function handleClose(): void {
@@ -122,19 +157,6 @@ function handleClose(): void {
               required
             />
             <AppTextField
-              id="member-email-upper"
-              v-model="form.emailUppercase"
-              label="Correo en mayúscula"
-              placeholder="USUARIO@EAFIT.EDU.CO"
-            />
-            <AppTextField
-              id="member-name"
-              v-model="form.name"
-              label="Nombre"
-              :error="errors.name"
-              required
-            />
-            <AppTextField
               id="member-full-name"
               v-model="form.fullName"
               label="Nombre completo en mayúscula"
@@ -143,9 +165,10 @@ function handleClose(): void {
             />
             <AppTextField
               id="member-epik"
-              v-model="form.epikId"
+              v-model="form.idEpik"
               label="ID EPIK"
-              :error="errors.epikId"
+              type="number"
+              :error="errors.idEpik"
               required
             />
             <div class="space-y-1.5">
@@ -190,16 +213,31 @@ function handleClose(): void {
             />
           </div>
 
+          <div class="space-y-1.5">
+            <label for="member-status" class="block text-sm font-semibold text-slate-700">
+              Estado en el grupo <span class="text-red-500">*</span>
+            </label>
+            <select
+              id="member-status"
+              class="w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              :class="errors.memberStatusId ? 'border-red-400' : 'border-slate-300'"
+              :value="form.memberStatusId ?? ''"
+              @change="onStatusChange"
+            >
+              <option value="" disabled>Selecciona un estado</option>
+              <option v-for="status in statuses" :key="status.id" :value="status.id">
+                {{ status.name }}
+              </option>
+            </select>
+            <p v-if="errors.memberStatusId" class="text-xs font-medium text-red-500">
+              {{ errors.memberStatusId }}
+            </p>
+          </div>
+
           <MultiSelect
-            v-model="form.membershipStatus"
-            label="Estado en el grupo"
-            :options="statusOptions"
-            :error="errors.membershipStatus"
-          />
-          <MultiSelect
-            v-model="form.areas"
+            v-model="form.committeeNames"
             label="Área a la que pertenece"
-            :options="areaOptions"
+            :options="committees.map((committee) => committee.name)"
             placeholder="Selecciona uno o más comités"
           />
 

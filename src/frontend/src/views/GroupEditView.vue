@@ -17,7 +17,6 @@ import type { NameDraft } from '@/types/NameDraft';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
 import { MemberStatusService } from '@/services/MemberStatusService';
-import { PermanenceTargetService } from '@/services/PermanenceTargetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { hasFormErrors, validateGroupBasics } from '@/utils/groupFormValidation';
@@ -57,7 +56,7 @@ function toStatusDrafts(items: MemberStatusInterface[]): MemberStatusDraft[] {
   const drafts = items.map((item: MemberStatusInterface) => ({
     id: item.id,
     name: item.name,
-    percentage: PermanenceTargetService.getTargetByMemberStatusId(item.id)?.percentage ?? 0,
+    percentage: item.target,
   }));
   return drafts.length > 0 ? drafts : [{ id: null, name: '', percentage: 0 }];
 }

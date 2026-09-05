@@ -1,4 +1,0 @@
-export const PERMANENCE_ACTIVITY_SCOPES = {
-  GENERAL: 'GENERAL',
-  COMMITTEE: 'COMMITTEE',
-} as const;

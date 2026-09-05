@@ -14,7 +14,6 @@ import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
 import { MemberService } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
-import { PermanenceTargetService } from '@/services/PermanenceTargetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { UserService } from '@/services/UserService';
@@ -44,7 +43,7 @@ const memberStatuses = computed<StatusWithTarget[]>(() =>
     (status: MemberStatusInterface) => ({
       id: status.id,
       name: status.name,
-      percentage: PermanenceTargetService.getTargetByMemberStatusId(status.id)?.percentage ?? 0,
+      percentage: status.target,
     }),
   ),
 );

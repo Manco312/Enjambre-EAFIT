@@ -2,17 +2,13 @@ import type { DocumentType } from '@/types/DocumentType';
 
 export interface MemberInterface {
   id: number;
-  groupId: number;
-  email: string;
-  name: string;
-  epikId: string;
+  idEpik: number;
   fullName: string;
   documentType: DocumentType;
   documentNumber: string;
-  emailUppercase: string;
+  email: string;
   phone: string;
   program: string;
   secondProgram: string;
-  membershipStatus: string[];
-  areas: string[];
+  committeeIds: number[];
 }

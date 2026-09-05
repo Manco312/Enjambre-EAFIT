@@ -8,9 +8,12 @@ import AppButton from '@/components/AppButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import MemberFormModal from '@/components/MemberFormModal.vue';
 import MemberTable from '@/components/MemberTable.vue';
+import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateMemberDTO } from '@/dtos/CreateMemberDTO';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
 import type { MemberInterface } from '@/interfaces/MemberInterface';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
+import type { MemberWithMembership } from '@/services/MemberService';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { AuthService } from '@/services/AuthService';
@@ -25,7 +28,7 @@ import { downloadBlob } from '@/utils/downloadBlob';
 import { slugify } from '@/utils/slugify';
 
 /* Types */
-type ColumnFilters = Partial<Record<keyof MemberInterface, string>>;
+type ColumnFilters = Partial<Record<string, string>>;
 
 /* Variables */
 const route = useRoute();
@@ -54,23 +57,19 @@ const group = computed<Nullable<GroupInterface>>(() =>
   groupId.value === null ? null : GroupService.getGroupById(groupId.value),
 );
 
-const allMembers = computed<MemberInterface[]>(() =>
+const allMembers = computed<MemberWithMembership[]>(() =>
   groupId.value === null ? [] : MemberService.getMembersByGroupId(groupId.value),
 );
 
-const areaOptions = computed<string[]>(() =>
-  groupId.value === null
-    ? []
-    : CommitteeService.getCommitteesByGroupId(groupId.value).map((committee) => committee.name),
+const committees = computed<CommitteeInterface[]>(() =>
+  groupId.value === null ? [] : CommitteeService.getCommitteesByGroupId(groupId.value),
 );
 
-const statusOptions = computed<string[]>(() =>
-  groupId.value === null
-    ? []
-    : MemberStatusService.getMemberStatusesByGroupId(groupId.value).map((status) => status.name),
+const statuses = computed<MemberStatusInterface[]>(() =>
+  groupId.value === null ? [] : MemberStatusService.getMemberStatusesByGroupId(groupId.value),
 );
 
-const filteredMembers = computed<MemberInterface[]>(() =>
+const filteredMembers = computed<MemberWithMembership[]>(() =>
   MemberService.filterMembers(allMembers.value, { search: search.value, columnFilters }),
 );
 
@@ -78,7 +77,7 @@ const totalPages = computed<number>(() =>
   Math.max(1, Math.ceil(filteredMembers.value.length / pageSize)),
 );
 
-const pagedMembers = computed<MemberInterface[]>(() => {
+const pagedMembers = computed<MemberWithMembership[]>(() => {
   const start = (page.value - 1) * pageSize;
   return filteredMembers.value.slice(start, start + pageSize);
 });
@@ -100,7 +99,7 @@ function onSearchInput(event: Event): void {
   resetToFirstPage();
 }
 
-function onFilterChange(key: keyof MemberInterface, value: string): void {
+function onFilterChange(key: string, value: string): void {
   columnFilters[key] = value;
   resetToFirstPage();
 }
@@ -110,13 +109,21 @@ function onMemberUpdate(id: number, dto: UpdateMemberDTO): void {
   ToastService.success('Cambios guardados.', 'member-inline-save');
 }
 
+function onMemberStatusUpdate(id: number, memberStatusId: number): void {
+  if (groupId.value === null) {
+    return;
+  }
+  MemberService.updateMemberStatus(id, groupId.value, memberStatusId);
+  ToastService.success('Cambios guardados.', 'member-inline-save');
+}
+
 function requestMemberDelete(id: number): void {
   memberPendingDelete.value = MemberService.getMemberById(id);
 }
 
 function confirmMemberDelete(): void {
   if (memberPendingDelete.value !== null) {
-    const label = memberPendingDelete.value.name || memberPendingDelete.value.email || 'Integrante';
+    const label = MemberService.getDisplayName(memberPendingDelete.value);
     MemberService.deleteMember(memberPendingDelete.value.id);
     ToastService.success(`«${label}» eliminado de la base de datos.`);
   }
@@ -124,10 +131,11 @@ function confirmMemberDelete(): void {
 }
 
 function addRowInline(): void {
-  if (groupId.value === null) {
+  const firstStatus = statuses.value[0];
+  if (groupId.value === null || firstStatus === undefined) {
     return;
   }
-  MemberService.createBlankMember(groupId.value);
+  MemberService.createBlankMember(groupId.value, firstStatus.id);
   page.value = totalPages.value;
   ToastService.info('Fila agregada. Completa los datos del integrante.');
 }
@@ -136,7 +144,7 @@ function onFormSubmit(dto: CreateMemberDTO): void {
   const member = MemberService.createMember(dto);
   isFormOpen.value = false;
   page.value = totalPages.value;
-  ToastService.success(`Integrante «${member.name || member.email}» agregado.`);
+  ToastService.success(`Integrante «${MemberService.getDisplayName(member)}» agregado.`);
 }
 
 async function exportToExcel(): Promise<void> {
@@ -229,10 +237,11 @@ function goBack(): void {
 
       <MemberTable
         :members="pagedMembers"
-        :area-options="areaOptions"
-        :status-options="statusOptions"
+        :committees="committees"
+        :statuses="statuses"
         :column-filters="columnFilters"
         @update="onMemberUpdate"
+        @update-status="onMemberStatusUpdate"
         @delete="requestMemberDelete"
         @filter-change="onFilterChange"
       />
@@ -254,8 +263,8 @@ function goBack(): void {
       <MemberFormModal
         :open="isFormOpen"
         :group-id="groupId ?? 0"
-        :area-options="areaOptions"
-        :status-options="statusOptions"
+        :committees="committees"
+        :statuses="statuses"
         @submit="onFormSubmit"
         @close="isFormOpen = false"
       />
@@ -263,7 +272,7 @@ function goBack(): void {
       <ConfirmDialog
         :open="memberPendingDelete !== null"
         title="Eliminar integrante"
-        :message="`Se eliminará a «${memberPendingDelete?.name || memberPendingDelete?.email || 'este integrante'}» de la base de datos. Esta acción no se puede deshacer.`"
+        :message="`Se eliminará a «${memberPendingDelete !== null ? MemberService.getDisplayName(memberPendingDelete) : 'este integrante'}» de la base de datos. Esta acción no se puede deshacer.`"
         confirm-label="Eliminar integrante"
         tone="danger"
         @confirm="confirmMemberDelete"

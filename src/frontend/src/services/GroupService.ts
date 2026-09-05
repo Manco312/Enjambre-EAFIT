@@ -5,12 +5,12 @@ import type { NameDraft } from '@/types/NameDraft';
 import type { Nullable } from '@/types/Nullable';
 import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
 import type { UpdateGroupDTO } from '@/dtos/UpdateGroupDTO';
+import { ActivityService } from '@/services/ActivityService';
 import { CommitteeService } from '@/services/CommitteeService';
 import { DomainError } from '@/utils/DomainError';
+import { GroupMemberService } from '@/services/GroupMemberService';
 import { MemberService } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
-import { PermanenceActivityService } from '@/services/PermanenceActivityService';
-import { PermanenceTargetService } from '@/services/PermanenceTargetService';
 import { USER_ROLES } from '@/constants/roles';
 import { UserService } from '@/services/UserService';
 import { clampPercentage } from '@/utils/clampPercentage';
@@ -123,8 +123,7 @@ export class GroupService {
       throw new DomainError('GROUP_NOT_FOUND');
     }
 
-    PermanenceActivityService.deleteActivitiesByGroupId(id);
-    PermanenceTargetService.deleteTargetsByGroupId(id);
+    ActivityService.deleteActivitiesByGroupId(id);
     MemberService.deleteMembersByGroupId(id);
     MemberStatusService.deleteMemberStatusesByGroupId(id);
     CommitteeService.deleteCommitteesByGroupId(id);
@@ -141,7 +140,8 @@ export class GroupService {
         CommitteeService.updateCommittee(id, { name });
       },
       remove: (id: number) => {
-        PermanenceActivityService.deleteActivitiesByCommitteeId(id);
+        ActivityService.deleteActivitiesByCommitteeId(id);
+        MemberService.removeCommitteeFromMembers(id);
         CommitteeService.deleteCommittee(id);
       },
     });
@@ -160,22 +160,38 @@ export class GroupService {
       .map((draft) => draft.id)
       .filter((id: Nullable<number>): id is number => id !== null);
 
+    // Se crean primero los estados nuevos para garantizar un estado de respaldo
+    // al que reasignar los miembros de un estado eliminado.
+    const survivingIds = [...keptIds];
+    cleaned
+      .filter((draft) => draft.id === null)
+      .forEach((draft) => {
+        const status = MemberStatusService.createMemberStatus({
+          name: draft.name,
+          groupId,
+          target: draft.percentage,
+        });
+        survivingIds.push(status.id);
+      });
+
+    const fallbackStatusId = survivingIds[0] ?? null;
     MemberStatusService.getMemberStatusesByGroupId(groupId)
       .filter((status) => !keptIds.includes(status.id))
       .forEach((status) => {
-        PermanenceTargetService.deleteTargetByMemberStatusId(status.id);
+        if (fallbackStatusId !== null) {
+          GroupMemberService.reassignStatus(status.id, fallbackStatusId);
+        }
         MemberStatusService.deleteMemberStatus(status.id);
       });
 
-    cleaned.forEach((draft) => {
-      if (draft.id === null) {
-        const status = MemberStatusService.createMemberStatus({ name: draft.name, groupId });
-        PermanenceTargetService.upsertForMemberStatus(groupId, status.id, draft.percentage);
-      } else {
-        MemberStatusService.updateMemberStatus(draft.id, { name: draft.name });
-        PermanenceTargetService.upsertForMemberStatus(groupId, draft.id, draft.percentage);
-      }
-    });
+    cleaned
+      .filter((draft): draft is typeof draft & { id: number } => draft.id !== null)
+      .forEach((draft) => {
+        MemberStatusService.updateMemberStatus(draft.id, {
+          name: draft.name,
+          target: draft.percentage,
+        });
+      });
   }
 
   private static reconcile(

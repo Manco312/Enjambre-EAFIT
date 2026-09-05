@@ -1,14 +1,11 @@
-import type { PermanenceActivityInterface } from '@/interfaces/PermanenceActivityInterface';
-import { PERMANENCE_ACTIVITY_SCOPES } from '@/constants/permanenceActivityScopes';
-
-const { GENERAL, COMMITTEE } = PERMANENCE_ACTIVITY_SCOPES;
+import type { ActivityInterface } from '@/interfaces/ActivityInterface';
 
 // Estructura tomada del archivo "Tabla de permanencia Provisional.xlsx" (raíz).
-export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
+// committeeId: null = actividad de la hoja general; con id = actividad propia de ese comité.
+export const activitySeeder: ActivityInterface[] = [
   {
     id: 1,
     groupId: 1,
-    scope: GENERAL,
     committeeId: null,
     name: 'Asambleas generales',
     description:
@@ -19,7 +16,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 2,
     groupId: 1,
-    scope: GENERAL,
     committeeId: null,
     name: 'Macroeventos',
     description: 'Participar en cada macroevento cumpliendo las responsabilidades asignadas.',
@@ -29,7 +25,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 3,
     groupId: 1,
-    scope: GENERAL,
     committeeId: null,
     name: 'Integración',
     description: 'Asistir a las integraciones del grupo.',
@@ -39,7 +34,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 4,
     groupId: 1,
-    scope: GENERAL,
     committeeId: null,
     name: 'Horas de carpa',
     description: 'Cumplir las horas de carpa especificadas para los eventos del semestre.',
@@ -49,7 +43,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 5,
     groupId: 1,
-    scope: GENERAL,
     committeeId: null,
     name: 'Assessment',
     description: 'Participar activamente en alguno de los roles del proceso de selección.',
@@ -59,7 +52,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 6,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 1,
     name: 'Asistencia a reuniones',
     description: 'Asistir a las reuniones semanales del comité.',
@@ -69,7 +61,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 7,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 1,
     name: 'Actitud',
     description: 'Actitud y disposición dentro del comité.',
@@ -79,7 +70,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 8,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 1,
     name: 'Trabajo en el comité',
     description: 'Cumplimiento del trabajo asignado dentro del comité.',
@@ -89,7 +79,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 9,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 2,
     name: 'Asistencia a reuniones',
     description: 'Asistir a las reuniones semanales del comité.',
@@ -99,7 +88,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 10,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 2,
     name: 'Actitud',
     description: 'Actitud y disposición dentro del comité.',
@@ -109,7 +97,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 11,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 2,
     name: 'Trabajo en el comité',
     description: 'Cumplimiento del trabajo asignado dentro del comité.',
@@ -119,7 +106,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 12,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 3,
     name: 'Asistencia a reuniones',
     description: 'Asistir a las reuniones semanales del comité.',
@@ -129,7 +115,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 13,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 3,
     name: 'Actitud',
     description: 'Actitud y disposición dentro del comité.',
@@ -139,7 +124,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 14,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 3,
     name: 'Trabajo en el comité',
     description: 'Cumplimiento del trabajo asignado dentro del comité (contactos y patrocinios).',
@@ -149,7 +133,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 15,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 4,
     name: 'Asistencia a reuniones',
     description: 'Asistir a las reuniones semanales del comité.',
@@ -159,7 +142,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 16,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 4,
     name: 'Actitud',
     description: 'Actitud y disposición dentro del comité.',
@@ -169,7 +151,6 @@ export const permanenceActivitySeeder: PermanenceActivityInterface[] = [
   {
     id: 17,
     groupId: 1,
-    scope: COMMITTEE,
     committeeId: 4,
     name: 'Trabajo en el comité',
     description: 'Cumplimiento del cronograma de publicaciones y proactividad.',

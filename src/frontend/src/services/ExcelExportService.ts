@@ -1,20 +1,19 @@
-import type { MemberInterface } from '@/interfaces/MemberInterface';
-import type { PermanenceRow, PermanenceSheetOption } from '@/services/PermanenceService';
+import type { PermanenceRow, PermanenceSheetOption } from '@/services/PermanenceSheetService';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
-import { MemberService } from '@/services/MemberService';
-import { PermanenceService } from '@/services/PermanenceService';
+import { MemberService, type MemberWithMembership } from '@/services/MemberService';
+import { PermanenceSheetService } from '@/services/PermanenceSheetService';
 
 type CellValue = string | number;
 
 export class ExcelExportService {
   public static async buildMembersBlob(
-    members: MemberInterface[],
+    members: MemberWithMembership[],
     sheetName: string,
   ): Promise<Blob> {
     const XLSX = await import('xlsx');
 
     const header = MEMBER_COLUMNS.map((column) => column.header);
-    const body = members.map((member: MemberInterface) =>
+    const body = members.map((member: MemberWithMembership) =>
       MEMBER_COLUMNS.map((column) => MemberService.fieldToText(member, column.key)),
     );
 
@@ -30,8 +29,8 @@ export class ExcelExportService {
     const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
 
-    PermanenceService.getSheetOptions(groupId).forEach((option: PermanenceSheetOption) => {
-      const sheet = PermanenceService.buildSheet(groupId, option.key);
+    PermanenceSheetService.getSheetOptions(groupId).forEach((option: PermanenceSheetOption) => {
+      const sheet = PermanenceSheetService.buildSheet(groupId, option.key);
 
       const header: CellValue[] = ['Integrante', 'Estado'];
       sheet.activityColumns.forEach((activity) => {
@@ -43,10 +42,7 @@ export class ExcelExportService {
       header.push('Puntaje %', 'Objetivo %', 'Cumple');
 
       const body: CellValue[][] = sheet.rows.map((row: PermanenceRow) => {
-        const cells: CellValue[] = [
-          row.member.name || row.member.email || 'Sin nombre',
-          row.statusLabel,
-        ];
+        const cells: CellValue[] = [MemberService.getDisplayName(row.member), row.statusLabel];
         sheet.activityColumns.forEach((activity) => {
           cells.push(row.values[activity.id] ?? 0);
         });

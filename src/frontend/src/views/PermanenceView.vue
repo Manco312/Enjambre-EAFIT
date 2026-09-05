@@ -4,25 +4,24 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
+import ActivityFormModal from '@/components/ActivityFormModal.vue';
 import AppButton from '@/components/AppButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import PermanenceActivityFormModal from '@/components/PermanenceActivityFormModal.vue';
 import PermanenceTable from '@/components/PermanenceTable.vue';
+import type { ActivityFormPayload } from '@/components/ActivityFormModal.vue';
+import type { ActivityInterface } from '@/interfaces/ActivityInterface';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
 import type { Nullable } from '@/types/Nullable';
-import type { PermanenceActivityFormPayload } from '@/components/PermanenceActivityFormModal.vue';
-import type { PermanenceActivityInterface } from '@/interfaces/PermanenceActivityInterface';
 import type {
   PermanenceSheetKey,
   PermanenceSheetOption,
   PermanenceSheetView,
-} from '@/services/PermanenceService';
+} from '@/services/PermanenceSheetService';
+import { ActivityService } from '@/services/ActivityService';
 import { AuthService } from '@/services/AuthService';
 import { ExcelExportService } from '@/services/ExcelExportService';
 import { GroupService } from '@/services/GroupService';
-import { PERMANENCE_ACTIVITY_SCOPES } from '@/constants/permanenceActivityScopes';
-import { PermanenceActivityService } from '@/services/PermanenceActivityService';
-import { PermanenceService } from '@/services/PermanenceService';
+import { PermanenceSheetService } from '@/services/PermanenceSheetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { downloadBlob } from '@/utils/downloadBlob';
@@ -35,8 +34,8 @@ const router = useRouter();
 /* Reactive Variables */
 const activeSheetKey = ref<PermanenceSheetKey>('general');
 const isFormOpen = ref<boolean>(false);
-const editingActivity = ref<Nullable<PermanenceActivityInterface>>(null);
-const activityPendingDelete = ref<Nullable<PermanenceActivityInterface>>(null);
+const editingActivity = ref<Nullable<ActivityInterface>>(null);
+const activityPendingDelete = ref<Nullable<ActivityInterface>>(null);
 const isExporting = ref<boolean>(false);
 
 /* Selectors */
@@ -54,7 +53,7 @@ const group = computed<Nullable<GroupInterface>>(() =>
 );
 
 const sheetOptions = computed<PermanenceSheetOption[]>(() =>
-  groupId.value === null ? [] : PermanenceService.getSheetOptions(groupId.value),
+  groupId.value === null ? [] : PermanenceSheetService.getSheetOptions(groupId.value),
 );
 
 const activeSheetLabel = computed<string>(
@@ -64,7 +63,9 @@ const activeSheetLabel = computed<string>(
 );
 
 const sheet = computed<Nullable<PermanenceSheetView>>(() =>
-  groupId.value === null ? null : PermanenceService.buildSheet(groupId.value, activeSheetKey.value),
+  groupId.value === null
+    ? null
+    : PermanenceSheetService.buildSheet(groupId.value, activeSheetKey.value),
 );
 
 const deleteMessage = computed<string>(() =>
@@ -94,26 +95,22 @@ function openCreate(): void {
 }
 
 function openEdit(activityId: number): void {
-  editingActivity.value = PermanenceActivityService.getActivityById(activityId);
+  editingActivity.value = ActivityService.getActivityById(activityId);
   isFormOpen.value = true;
 }
 
-function onFormSubmit(payload: PermanenceActivityFormPayload): void {
+function onFormSubmit(payload: ActivityFormPayload): void {
   if (groupId.value === null) {
     return;
   }
 
   if (editingActivity.value !== null) {
-    PermanenceActivityService.updateActivity(editingActivity.value.id, payload);
+    ActivityService.updateActivity(editingActivity.value.id, payload);
     ToastService.success('Actividad actualizada.');
   } else {
     const key = activeSheetKey.value;
-    PermanenceActivityService.createActivity({
+    ActivityService.createActivity({
       groupId: groupId.value,
-      scope:
-        key === 'general'
-          ? PERMANENCE_ACTIVITY_SCOPES.GENERAL
-          : PERMANENCE_ACTIVITY_SCOPES.COMMITTEE,
       committeeId: key === 'general' ? null : key,
       name: payload.name,
       description: payload.description,
@@ -128,20 +125,20 @@ function onFormSubmit(payload: PermanenceActivityFormPayload): void {
 }
 
 function requestDeleteActivity(activityId: number): void {
-  activityPendingDelete.value = PermanenceActivityService.getActivityById(activityId);
+  activityPendingDelete.value = ActivityService.getActivityById(activityId);
 }
 
 function confirmDeleteActivity(): void {
   if (activityPendingDelete.value !== null) {
     const name = activityPendingDelete.value.name;
-    PermanenceActivityService.deleteActivity(activityPendingDelete.value.id);
+    ActivityService.deleteActivity(activityPendingDelete.value.id);
     ToastService.success(`Actividad «${name}» eliminada.`);
   }
   activityPendingDelete.value = null;
 }
 
 function onSetValue(activityId: number, memberId: number, value: number): void {
-  PermanenceService.setValue(activityId, memberId, value);
+  PermanenceSheetService.setValue(activityId, memberId, value);
   ToastService.success('Cambios guardados.', 'permanence-save');
 }
 
@@ -245,7 +242,7 @@ function goBack(): void {
         @delete-activity="requestDeleteActivity"
       />
 
-      <PermanenceActivityFormModal
+      <ActivityFormModal
         :open="isFormOpen"
         :sheet-label="activeSheetLabel"
         :activity="editingActivity"

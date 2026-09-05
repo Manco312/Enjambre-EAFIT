@@ -2,6 +2,7 @@ import type { CreateMemberStatusDTO } from '@/dtos/CreateMemberStatusDTO';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberStatusDTO } from '@/dtos/UpdateMemberStatusDTO';
+import { clampPercentage } from '@/utils/clampPercentage';
 import { generateId } from '@/utils/generateId';
 import { useMemberStatusStore } from '@/stores/memberstatusstore';
 
@@ -30,6 +31,7 @@ export class MemberStatusService {
       id: generateId(store.memberStatuses),
       name: dto.name.trim(),
       groupId: dto.groupId,
+      target: clampPercentage(dto.target),
     };
     store.addMemberStatus(status);
     return status;
@@ -45,6 +47,7 @@ export class MemberStatusService {
       ...current,
       ...dto,
       name: (dto.name ?? current.name).trim(),
+      target: clampPercentage(dto.target ?? current.target),
     };
     useMemberStatusStore().updateMemberStatus(updated);
     return updated;

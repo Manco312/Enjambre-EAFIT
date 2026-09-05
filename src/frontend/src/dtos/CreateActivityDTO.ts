@@ -1,9 +1,7 @@
 import type { Nullable } from '@/types/Nullable';
-import type { PermanenceActivityScope } from '@/types/PermanenceActivityScope';
 
-export interface CreatePermanenceActivityDTO {
+export interface CreateActivityDTO {
   groupId: number;
-  scope: PermanenceActivityScope;
   committeeId: Nullable<number>;
   name: string;
   description: string;

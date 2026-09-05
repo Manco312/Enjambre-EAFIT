@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /* Internal Imports */
 import MultiSelect from '@/components/MultiSelect.vue';
+import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { DocumentType } from '@/types/DocumentType';
-import type { MemberInterface } from '@/interfaces/MemberInterface';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
+import type { MemberWithMembership } from '@/services/MemberService';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
@@ -11,10 +13,10 @@ import { MemberService } from '@/services/MemberService';
 /* Props */
 const props = withDefaults(
   defineProps<{
-    members: MemberInterface[];
-    areaOptions: string[];
-    statusOptions: string[];
-    columnFilters: Partial<Record<keyof MemberInterface, string>>;
+    members: MemberWithMembership[];
+    committees: CommitteeInterface[];
+    statuses: MemberStatusInterface[];
+    columnFilters: Partial<Record<string, string>>;
     readonly?: boolean;
   }>(),
   { readonly: false },
@@ -23,43 +25,53 @@ const props = withDefaults(
 /* Emits */
 const emit = defineEmits<{
   update: [id: number, dto: UpdateMemberDTO];
+  updateStatus: [id: number, memberStatusId: number];
   delete: [id: number];
-  filterChange: [key: keyof MemberInterface, value: string];
+  filterChange: [key: string, value: string];
 }>();
 
 /* Functions */
-function cellText(member: MemberInterface, key: keyof MemberInterface): string {
+function cellText(member: MemberWithMembership, key: string): string {
   return MemberService.fieldToText(member, key);
 }
 
-function filterValue(key: keyof MemberInterface): string {
+function filterValue(key: string): string {
   return props.columnFilters[key] ?? '';
 }
 
-function onFilterInput(key: keyof MemberInterface, event: Event): void {
+function onFilterInput(key: string, event: Event): void {
   const target = event.target as HTMLInputElement | HTMLSelectElement;
   emit('filterChange', key, target.value);
 }
 
-function onTextInput(member: MemberInterface, key: keyof MemberInterface, event: Event): void {
+function onTextInput(member: MemberWithMembership, key: string, event: Event): void {
   const target = event.target as HTMLInputElement;
-  emit('update', member.id, { [key]: target.value } as UpdateMemberDTO);
+  const value = key === 'idEpik' ? Number(target.value) : target.value;
+  emit('update', member.id, { [key]: value } as UpdateMemberDTO);
 }
 
-function onDocumentTypeChange(member: MemberInterface, event: Event): void {
+function onDocumentTypeChange(member: MemberWithMembership, event: Event): void {
   const target = event.target as HTMLSelectElement;
   emit('update', member.id, { documentType: target.value as DocumentType });
 }
 
-function onStatusChange(member: MemberInterface, value: string[]): void {
-  emit('update', member.id, { membershipStatus: value });
+function onStatusChange(member: MemberWithMembership, event: Event): void {
+  const target = event.target as HTMLSelectElement;
+  emit('updateStatus', member.id, Number(target.value));
 }
 
-function onAreasChange(member: MemberInterface, value: string[]): void {
-  emit('update', member.id, { areas: value });
+function committeeNames(member: MemberWithMembership): string[] {
+  return MemberService.getCommitteeNames(member);
 }
 
-function onDelete(member: MemberInterface): void {
+function onAreasChange(member: MemberWithMembership, names: string[]): void {
+  const committeeIds = props.committees
+    .filter((committee: CommitteeInterface) => names.includes(committee.name))
+    .map((committee: CommitteeInterface) => committee.id);
+  emit('update', member.id, { committeeIds });
+}
+
+function onDelete(member: MemberWithMembership): void {
   emit('delete', member.id);
 }
 </script>
@@ -125,20 +137,22 @@ function onDelete(member: MemberInterface): void {
               <span class="block px-1 py-1 text-slate-700">{{ cellText(member, column.key) }}</span>
             </template>
 
-            <MultiSelect
+            <select
               v-else-if="column.kind === 'membershipStatus'"
-              compact
-              :open-up="rowIndex >= members.length - 4 && members.length > 6"
-              :model-value="member.membershipStatus"
-              :options="statusOptions"
-              @update:model-value="onStatusChange(member, $event)"
-            />
+              class="w-full min-w-40 rounded-md border border-transparent px-2 py-1.5 text-ink outline-none hover:border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              :value="member.memberStatusId"
+              @change="onStatusChange(member, $event)"
+            >
+              <option v-for="status in statuses" :key="status.id" :value="status.id">
+                {{ status.name }}
+              </option>
+            </select>
             <MultiSelect
               v-else-if="column.kind === 'areas'"
               compact
               :open-up="rowIndex >= members.length - 4 && members.length > 6"
-              :model-value="member.areas"
-              :options="areaOptions"
+              :model-value="committeeNames(member)"
+              :options="committees.map((committee) => committee.name)"
               @update:model-value="onAreasChange(member, $event)"
             />
             <select
@@ -153,7 +167,9 @@ function onDelete(member: MemberInterface): void {
             </select>
             <input
               v-else
-              :type="column.kind === 'email' ? 'email' : 'text'"
+              :type="
+                column.kind === 'email' ? 'email' : column.key === 'idEpik' ? 'number' : 'text'
+              "
               class="w-full min-w-40 rounded-md border border-transparent px-2 py-1.5 text-ink outline-none hover:border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
               :value="cellText(member, column.key)"
               @change="onTextInput(member, column.key, $event)"

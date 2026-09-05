@@ -6,18 +6,18 @@ import { computed, reactive, ref, watch } from 'vue';
 import AlertBanner from '@/components/AlertBanner.vue';
 import AppButton from '@/components/AppButton.vue';
 import AppTextField from '@/components/AppTextField.vue';
+import type { ActivityInterface } from '@/interfaces/ActivityInterface';
 import type { Nullable } from '@/types/Nullable';
-import type { PermanenceActivityInterface } from '@/interfaces/PermanenceActivityInterface';
 
 /* Types */
-export interface PermanenceActivityFormPayload {
+export interface ActivityFormPayload {
   name: string;
   description: string;
   weight: number;
   period: string;
 }
 
-interface PermanenceActivityFormErrors {
+interface ActivityFormErrors {
   name?: string;
   weight?: string;
 }
@@ -26,20 +26,20 @@ interface PermanenceActivityFormErrors {
 const props = defineProps<{
   open: boolean;
   sheetLabel: string;
-  activity: Nullable<PermanenceActivityInterface>;
+  activity: Nullable<ActivityInterface>;
 }>();
 
 /* Emits */
-const emit = defineEmits<{ submit: [payload: PermanenceActivityFormPayload]; close: [] }>();
+const emit = defineEmits<{ submit: [payload: ActivityFormPayload]; close: [] }>();
 
 /* Reactive Variables */
-const form = reactive<PermanenceActivityFormPayload>({
+const form = reactive<ActivityFormPayload>({
   name: '',
   description: '',
   weight: 0,
   period: '',
 });
-const errors = ref<PermanenceActivityFormErrors>({});
+const errors = ref<ActivityFormErrors>({});
 
 /* Selectors */
 const isEditing = computed<boolean>(() => props.activity !== null);
@@ -72,7 +72,7 @@ function onWeightInput(event: Event): void {
 }
 
 function validate(): boolean {
-  const next: PermanenceActivityFormErrors = {};
+  const next: ActivityFormErrors = {};
   if (form.name.trim().length < 3) {
     next.name = 'El nombre debe tener al menos 3 caracteres.';
   }

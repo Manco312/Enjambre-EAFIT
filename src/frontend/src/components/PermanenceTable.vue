@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* Internal Imports */
-import type { PermanenceRow, PermanenceSheetView } from '@/services/PermanenceService';
+import type { PermanenceRow, PermanenceSheetView } from '@/services/PermanenceSheetService';
+import { MemberService } from '@/services/MemberService';
 
 /* Props */
 withDefaults(defineProps<{ sheet: PermanenceSheetView; readonly?: boolean }>(), {
@@ -115,7 +116,7 @@ function rowClass(row: PermanenceRow): string {
             class="sticky left-0 z-10 border-r border-slate-100 px-3 py-2 font-medium text-ink"
             :class="rowClass(row)"
           >
-            {{ row.member.name || row.member.email || 'Sin nombre' }}
+            {{ MemberService.getDisplayName(row.member) }}
           </td>
           <td class="px-3 py-2 text-xs text-slate-500">{{ row.statusLabel }}</td>
 

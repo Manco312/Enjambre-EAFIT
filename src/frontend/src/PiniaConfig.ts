@@ -2,13 +2,13 @@ import { createPinia, type Pinia, type StateTree } from 'pinia';
 import { watch } from 'vue';
 
 import { STORAGE_KEYS } from '@/constants/storageKeys';
+import { activitySeeder } from '@/seeders/activityseeder';
 import { committeeSeeder } from '@/seeders/committeeseeder';
+import { groupMemberSeeder } from '@/seeders/groupmemberseeder';
 import { groupSeeder } from '@/seeders/groupseeder';
 import { memberSeeder } from '@/seeders/memberseeder';
 import { memberStatusSeeder } from '@/seeders/memberstatusseeder';
-import { permanenceActivitySeeder } from '@/seeders/permanenceactivityseeder';
-import { permanenceRecordSeeder } from '@/seeders/permanencerecordseeder';
-import { permanenceTargetSeeder } from '@/seeders/permanencetargetseeder';
+import { permanenceSeeder } from '@/seeders/permanenceseeder';
 import { userSeeder } from '@/seeders/userseeder';
 
 type PiniaState = Record<string, StateTree>;
@@ -62,18 +62,17 @@ export default class PiniaConfig {
       member: {
         members: memberSeeder.map((member) => ({
           ...member,
-          membershipStatus: [...member.membershipStatus],
-          areas: [...member.areas],
+          committeeIds: [...member.committeeIds],
         })),
       },
-      permanenceTarget: {
-        targets: permanenceTargetSeeder.map((target) => ({ ...target })),
+      groupMember: {
+        groupMembers: groupMemberSeeder.map((groupMember) => ({ ...groupMember })),
       },
-      permanenceActivity: {
-        activities: permanenceActivitySeeder.map((activity) => ({ ...activity })),
+      activity: {
+        activities: activitySeeder.map((activity) => ({ ...activity })),
       },
-      permanenceRecord: {
-        records: permanenceRecordSeeder.map((record) => ({ ...record })),
+      permanence: {
+        permanences: permanenceSeeder.map((permanence) => ({ ...permanence })),
       },
     };
   }
