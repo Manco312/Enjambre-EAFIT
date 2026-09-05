@@ -21,7 +21,7 @@ export class User {
   @Column()
   role: string;
 
-  @OneToOne('Group', 'user', { nullable: true })
+  @OneToOne('Group', 'user', { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_group' })
   group: Group | null;
 }

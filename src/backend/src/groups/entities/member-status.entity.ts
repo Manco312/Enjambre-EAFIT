@@ -21,7 +21,7 @@ export class MemberStatus {
   @Column()
   target: number;
 
-  @ManyToOne('Group', 'memberStatuses')
+  @ManyToOne('Group', 'memberStatuses', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_group' })
   group: Group;
 

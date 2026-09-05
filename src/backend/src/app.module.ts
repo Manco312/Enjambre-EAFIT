@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { HomeModule } from './home/home.module.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -17,7 +16,6 @@ import { CommitteesModule } from './committees/committees.module.js';
       autoLoadEntities: true,
       synchronize: true,
     }),
-    HomeModule,
     AuthModule,
     UsersModule,
     PermanencesModule,

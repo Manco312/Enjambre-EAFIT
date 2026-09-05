@@ -20,7 +20,7 @@ export class Committee {
   @Column()
   name: string;
 
-  @ManyToOne('Group', 'committees')
+  @ManyToOne('Group', 'committees', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_group' })
   group: Group;
 

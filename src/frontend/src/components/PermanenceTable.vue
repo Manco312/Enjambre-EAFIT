@@ -39,7 +39,7 @@ function rowClass(row: PermanenceRow): string {
   </div>
 
   <div v-else class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-    <table class="w-full min-w-[900px] border-collapse text-sm">
+    <table class="w-full min-w-225 border-collapse text-sm">
       <thead>
         <tr class="bg-slate-50 text-left text-xs font-bold tracking-wide text-slate-500 uppercase">
           <th class="sticky left-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-2.5">
