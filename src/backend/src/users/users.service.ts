@@ -15,36 +15,4 @@ export class UsersService {
   async findOne(username: string): Promise<User | null> {
     return await this.usersRepository.findOneBy({ username });
   }
-
-  /*
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.findOne(createUserDto.username);
-
-    if (existingUser) {
-      throw new BadRequestException('Este nombre de usuario ya está en uso.');
-    }
-
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-
-    const user = this.usersRepository.create({
-      ...createUserDto,
-      password: hashedPassword,
-      role: 'board',
-    });
-
-    return await this.usersRepository.save(user);
-  }
-
-  async createAdmin(): Promise<User> {
-    const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD!, 10);
-
-    const admin = this.usersRepository.create({
-      username: process.env.ADMIN_USERNAME,
-      password: hashedPassword,
-      role: 'admin',
-    });
-
-    return await this.usersRepository.save(admin);
-  }
-  */
 }

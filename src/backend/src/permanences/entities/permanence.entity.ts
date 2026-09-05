@@ -18,11 +18,11 @@ export class Permanence {
   @Column()
   percentage: number;
 
-  @ManyToOne('Member', 'permanences')
+  @ManyToOne('Member', 'permanences', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_member' })
   member: Member;
 
-  @ManyToOne('Activity', 'permanences')
+  @ManyToOne('Activity', 'permanences', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_activity' })
   activity: Activity;
 }

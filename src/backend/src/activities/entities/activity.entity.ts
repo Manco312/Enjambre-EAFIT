@@ -27,11 +27,11 @@ export class Activity {
   @Column()
   period: string;
 
-  @ManyToOne('Group', 'activities')
+  @ManyToOne('Group', 'activities', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_group' })
   group: Group;
 
-  @ManyToOne('Committee', 'activities', { nullable: true })
+  @ManyToOne('Committee', 'activities', { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_committee' })
   committee: Committee | null;
 

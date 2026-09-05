@@ -15,11 +15,11 @@ export class GroupMember {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne('Member', 'groupMembers')
+  @ManyToOne('Member', 'groupMembers', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_member' })
   member: Member;
 
-  @ManyToOne('Group', 'members')
+  @ManyToOne('Group', 'members', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_group' })
   group: Group;
 
