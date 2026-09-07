@@ -3,6 +3,7 @@ import {
   Entity,
   OneToMany,
   ManyToMany,
+  JoinTable,
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -32,7 +33,12 @@ export class Member {
   @Column({ name: 'document_type', type: 'varchar', length: 100 })
   documentType: string;
 
-  @Column({ name: 'document_number', type: 'varchar', length: 100, unique: true })
+  @Column({
+    name: 'document_number',
+    type: 'varchar',
+    length: 100,
+    unique: true,
+  })
   documentNumber: string;
 
   @Column({
@@ -52,13 +58,21 @@ export class Member {
   @Column({ type: 'varchar', length: 255 })
   program: string;
 
-  @Column({ name: 'second_program', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'second_program',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   secondProgram: string;
 
   @OneToMany('GroupMember', 'member')
   groupMembers: GroupMember[];
 
-  @ManyToMany('Committee', 'members')
+  @ManyToMany(() => Committee, (committee) => committee.members, {
+    eager: true,
+  })
+  @JoinTable({ name: 'committee_member' })
   committees: Committee[];
 
   @OneToMany('Permanence', 'member')

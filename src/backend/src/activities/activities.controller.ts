@@ -1,4 +1,13 @@
-import { Controller, Body, Param, ParseIntPipe, Get, Post, Patch, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Body,
+  Param,
+  ParseIntPipe,
+  Get,
+  Post,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import { DeleteResult } from 'typeorm';
 import { Activity } from './entities/activity.entity.js';
 import { ActivitiesService } from './activities.service.js';
@@ -15,7 +24,9 @@ export class ActivitiesController {
   }
 
   @Post()
-  async create(@Body() createActivityDto: CreateActivityDto): Promise<Activity> {
+  async create(
+    @Body() createActivityDto: CreateActivityDto,
+  ): Promise<Activity> {
     return await this.activitiesService.create(createActivityDto);
   }
 

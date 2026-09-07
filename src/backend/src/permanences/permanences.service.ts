@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
@@ -27,18 +31,24 @@ export class PermanencesService {
     return permanence;
   }
 
-  async findByMemberAndActivity(memberId: number, activityId: number): Promise<Permanence | null> {
+  async findByMemberAndActivity(
+    memberId: number,
+    activityId: number,
+  ): Promise<Permanence | null> {
     return await this.permanencesRepository.findOne({
       where: {
         member: { id: memberId },
         activity: { id: activityId },
-      }
+      },
     });
   }
 
   async create(createPermanenceDto: CreatePermanenceDto): Promise<Permanence> {
     const { memberId, activityId, ...permanenceData } = createPermanenceDto;
-    const existingPermanence = await this.findByMemberAndActivity(memberId, activityId);
+    const existingPermanence = await this.findByMemberAndActivity(
+      memberId,
+      activityId,
+    );
 
     if (existingPermanence) {
       throw new ConflictException(

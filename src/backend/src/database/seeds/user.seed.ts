@@ -14,9 +14,7 @@ export async function seedUsers() {
   });
 
   if (!boardGroup) {
-    throw new Error(
-      'No se encontró el grupo para el usuario board.',
-    );
+    throw new Error('No se encontró el grupo para el usuario board.');
   }
 
   const users = [
@@ -36,9 +34,7 @@ export async function seedUsers() {
 
   for (const data of users) {
     if (!data.username || !data.password) {
-      throw new Error(
-        `Faltan las credenciales para el usuario ${data.role}.`,
-      );
+      throw new Error(`Faltan las credenciales para el usuario ${data.role}.`);
     }
 
     const existingUser = await userRepository.findOne({

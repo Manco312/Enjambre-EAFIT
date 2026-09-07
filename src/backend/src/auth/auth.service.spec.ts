@@ -82,9 +82,9 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException when the user does not exist', async () => {
       vi.spyOn(usersService, 'findOne').mockResolvedValue(null);
 
-      await expect(
-        service.signIn('unknown', 'password123'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.signIn('unknown', 'password123')).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(usersService.findOne).toHaveBeenCalledWith('unknown');
       expect(bcrypt.compare).not.toHaveBeenCalled();
@@ -102,9 +102,9 @@ describe('AuthService', () => {
       vi.spyOn(usersService, 'findOne').mockResolvedValue(user);
       vi.mocked(bcrypt.compare).mockImplementation(async () => false);
 
-      await expect(
-        service.signIn('john', 'wrongPassword'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.signIn('john', 'wrongPassword')).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(usersService.findOne).toHaveBeenCalledWith('john');
 

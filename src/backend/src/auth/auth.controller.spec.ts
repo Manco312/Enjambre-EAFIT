@@ -44,10 +44,7 @@ describe('AuthController', () => {
 
       const result = await controller.signIn(signInDto);
 
-      expect(authService.signIn).toHaveBeenCalledWith(
-        'john',
-        'password123',
-      );
+      expect(authService.signIn).toHaveBeenCalledWith('john', 'password123');
 
       expect(result).toBe(response);
     });
@@ -66,11 +63,7 @@ describe('AuthController', () => {
         UnauthorizedException,
       );
 
-      expect(authService.signIn).toHaveBeenCalledWith(
-        'john',
-        'wrong-password',
-      );
+      expect(authService.signIn).toHaveBeenCalledWith('john', 'wrong-password');
     });
   });
 });
-

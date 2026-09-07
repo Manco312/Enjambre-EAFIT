@@ -5,7 +5,6 @@ import {
   ManyToMany,
   ManyToOne,
   JoinColumn,
-  JoinTable,
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -32,8 +31,7 @@ export class Committee {
   @OneToMany('Activity', 'committee')
   activities: Activity[];
 
-  @ManyToMany('Member', 'committees')
-  @JoinTable()
+  @ManyToMany(() => Member, (member) => member.committees)
   members: Member[];
 
   @CreateDateColumn()

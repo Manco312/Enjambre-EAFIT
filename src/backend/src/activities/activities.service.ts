@@ -31,10 +31,11 @@ export class ActivitiesService {
   async create(createActivityDto: CreateActivityDto): Promise<Activity> {
     const { groupId, committeeId, ...activityData } = createActivityDto;
     const group = await this.groupsService.findById(groupId);
-    const committee = committeeId === null
-      ? null
-      : await this.committeesService.findById(committeeId);
-    
+    const committee =
+      committeeId === null
+        ? null
+        : await this.committeesService.findById(committeeId);
+
     if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }
@@ -74,9 +75,10 @@ export class ActivitiesService {
     }
 
     if (committeeId !== undefined) {
-      const committee = committeeId === null
-      ? null
-      : await this.committeesService.findById(committeeId);
+      const committee =
+        committeeId === null
+          ? null
+          : await this.committeesService.findById(committeeId);
       activity.committee = committee;
     }
 

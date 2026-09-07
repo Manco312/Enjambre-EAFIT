@@ -29,9 +29,7 @@ export async function seedActivities() {
   });
 
   if (!communicationsCommittee) {
-    throw new Error(
-      'No existe el Comité de Comunicaciones.',
-    );
+    throw new Error('No existe el Comité de Comunicaciones.');
   }
 
   const activitiesData = [

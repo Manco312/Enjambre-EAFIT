@@ -1,4 +1,13 @@
-import { Controller, Body, Param, ParseIntPipe, Get, Post, Patch, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Body,
+  Param,
+  ParseIntPipe,
+  Get,
+  Post,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import { DeleteResult } from 'typeorm';
 
 import { Permanence } from './entities/permanence.entity.js';
@@ -11,12 +20,14 @@ export class PermanencesController {
   constructor(private readonly permanencesService: PermanencesService) {}
 
   @Get(':id')
-    async findById(@Param('id', ParseIntPipe) id: number): Promise<Permanence> {
-      return await this.permanencesService.findById(id);
-    }
-  
+  async findById(@Param('id', ParseIntPipe) id: number): Promise<Permanence> {
+    return await this.permanencesService.findById(id);
+  }
+
   @Post()
-  async create(@Body() createPermanenceDto: CreatePermanenceDto): Promise<Permanence> {
+  async create(
+    @Body() createPermanenceDto: CreatePermanenceDto,
+  ): Promise<Permanence> {
     return await this.permanencesService.create(createPermanenceDto);
   }
 
