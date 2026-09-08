@@ -16,6 +16,9 @@ describe('ActivitiesController', () => {
         {
           provide: ActivitiesService,
           useValue: {
+            findAll: vi.fn(),
+            findByGroup: vi.fn(),
+            findByCommittee: vi.fn(),
             findById: vi.fn(),
             create: vi.fn(),
             update: vi.fn(),
@@ -31,6 +34,37 @@ describe('ActivitiesController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    const activities = [{ id: 1, name: 'Activity 1' }] as Activity[];
+
+    it('should return every activity when no query is given', async () => {
+      vi.spyOn(service, 'findAll').mockResolvedValue(activities);
+
+      const result = await controller.findAll();
+
+      expect(service.findAll).toHaveBeenCalledWith();
+      expect(result).toBe(activities);
+    });
+
+    it('should filter by groupId when provided', async () => {
+      vi.spyOn(service, 'findByGroup').mockResolvedValue(activities);
+
+      const result = await controller.findAll(3);
+
+      expect(service.findByGroup).toHaveBeenCalledWith(3);
+      expect(result).toBe(activities);
+    });
+
+    it('should filter by committeeId when provided', async () => {
+      vi.spyOn(service, 'findByCommittee').mockResolvedValue(activities);
+
+      const result = await controller.findAll(undefined, 7);
+
+      expect(service.findByCommittee).toHaveBeenCalledWith(7);
+      expect(result).toBe(activities);
+    });
   });
 
   // Test 1

@@ -1,62 +1,59 @@
+import axios from 'axios';
+
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateCommitteeDTO } from '@/dtos/CreateCommitteeDTO';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateCommitteeDTO } from '@/dtos/UpdateCommitteeDTO';
-import { DomainError } from '@/utils/DomainError';
-import { generateId } from '@/utils/generateId';
-import { useCommitteeStore } from '@/stores/committeestore';
+import { ENVIRONMENT } from '@/constants/environment';
+
+const COMMITTEES_URL = `${ENVIRONMENT.API_URL}/committees`;
 
 export class CommitteeService {
-  public static getCommittees(): CommitteeInterface[] {
-    return useCommitteeStore().committees;
+  public static async getCommittees(): Promise<CommitteeInterface[]> {
+    const { data } = await axios.get<CommitteeInterface[]>(COMMITTEES_URL);
+    return data;
   }
 
-  public static getCommitteeById(id: number): Nullable<CommitteeInterface> {
-    return (
-      useCommitteeStore().committees.find((committee: CommitteeInterface) => committee.id === id) ??
-      null
-    );
+  public static async getCommitteeById(id: number): Promise<Nullable<CommitteeInterface>> {
+    try {
+      const { data } = await axios.get<CommitteeInterface>(`${COMMITTEES_URL}/${id}`);
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
-  public static getCommitteesByGroupId(groupId: number): CommitteeInterface[] {
-    return useCommitteeStore().committees.filter(
-      (committee: CommitteeInterface) => committee.groupId === groupId,
-    );
+  public static async getCommitteesByGroupId(groupId: number): Promise<CommitteeInterface[]> {
+    const { data } = await axios.get<CommitteeInterface[]>(COMMITTEES_URL, {
+      params: { groupId },
+    });
+    return data;
   }
 
-  public static createCommittee(dto: CreateCommitteeDTO): CommitteeInterface {
-    const store = useCommitteeStore();
-    const committee: CommitteeInterface = {
-      id: generateId(store.committees),
+  public static async createCommittee(dto: CreateCommitteeDTO): Promise<CommitteeInterface> {
+    const { data } = await axios.post<CommitteeInterface>(COMMITTEES_URL, {
       name: dto.name.trim(),
       groupId: dto.groupId,
-    };
-    store.addCommittee(committee);
-    return committee;
-  }
-
-  public static updateCommittee(id: number, dto: UpdateCommitteeDTO): CommitteeInterface {
-    const current = CommitteeService.getCommitteeById(id);
-    if (current === null) {
-      throw new DomainError('COMMITTEE_NOT_FOUND');
-    }
-
-    const updated: CommitteeInterface = {
-      ...current,
-      ...dto,
-      name: (dto.name ?? current.name).trim(),
-    };
-    useCommitteeStore().updateCommittee(updated);
-    return updated;
-  }
-
-  public static deleteCommittee(id: number): void {
-    useCommitteeStore().removeCommittee(id);
-  }
-
-  public static deleteCommitteesByGroupId(groupId: number): void {
-    CommitteeService.getCommitteesByGroupId(groupId).forEach((committee: CommitteeInterface) => {
-      CommitteeService.deleteCommittee(committee.id);
     });
+    return data;
+  }
+
+  public static async updateCommittee(
+    id: number,
+    dto: UpdateCommitteeDTO,
+  ): Promise<CommitteeInterface> {
+    const payload: UpdateCommitteeDTO = {
+      ...dto,
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+    };
+    const { data } = await axios.patch<CommitteeInterface>(`${COMMITTEES_URL}/${id}`, payload);
+    return data;
+  }
+
+  public static async deleteCommittee(id: number): Promise<void> {
+    await axios.delete(`${COMMITTEES_URL}/${id}`);
   }
 }

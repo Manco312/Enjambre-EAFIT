@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryGeneratedColumn,
+  RelationId,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -27,6 +28,9 @@ export class Committee {
   })
   @JoinColumn({ referencedColumnName: 'id' })
   group: Group;
+
+  @RelationId((committee: Committee) => committee.group)
+  groupId: number;
 
   @OneToMany('Activity', 'committee')
   activities: Activity[];

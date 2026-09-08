@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* External Imports */
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
@@ -41,10 +41,12 @@ const form = reactive<GroupEditForm>({
 });
 const errors = ref<GroupFormErrors>({});
 const formError = ref<string>('');
+const isLoading = ref<boolean>(true);
+const isSubmitting = ref<boolean>(false);
+const groupExists = ref<boolean>(false);
 
 /* Selectors */
 const groupId = computed<number>(() => Number(route.params.id));
-const groupExists = computed<boolean>(() => GroupService.getGroupById(groupId.value) !== null);
 
 /* Functions */
 function toCommitteeDrafts(items: CommitteeInterface[]): NameDraft[] {
@@ -61,18 +63,32 @@ function toStatusDrafts(items: MemberStatusInterface[]): MemberStatusDraft[] {
   return drafts.length > 0 ? drafts : [{ id: null, name: '', percentage: 0 }];
 }
 
-function loadGroup(): void {
-  const group = GroupService.getGroupById(groupId.value);
-  if (group === null) {
-    return;
-  }
+async function loadGroup(): Promise<void> {
+  isLoading.value = true;
+  try {
+    const [group, committees, statuses] = await Promise.all([
+      GroupService.getGroupById(groupId.value),
+      CommitteeService.getCommitteesByGroupId(groupId.value),
+      MemberStatusService.getMemberStatusesByGroupId(groupId.value),
+    ]);
 
-  form.name = group.name;
-  form.committees = toCommitteeDrafts(CommitteeService.getCommitteesByGroupId(groupId.value));
-  form.statuses = toStatusDrafts(MemberStatusService.getMemberStatusesByGroupId(groupId.value));
+    if (group === null) {
+      groupExists.value = false;
+      return;
+    }
+
+    groupExists.value = true;
+    form.name = group.name;
+    form.committees = toCommitteeDrafts(committees);
+    form.statuses = toStatusDrafts(statuses);
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  } finally {
+    isLoading.value = false;
+  }
 }
 
-function handleSubmit(): void {
+async function handleSubmit(): Promise<void> {
   formError.value = '';
 
   errors.value = validateGroupBasics(
@@ -84,8 +100,9 @@ function handleSubmit(): void {
     return;
   }
 
+  isSubmitting.value = true;
   try {
-    GroupService.updateGroupDetails(groupId.value, {
+    await GroupService.updateGroupDetails(groupId.value, {
       name: form.name,
       committees: form.committees,
       statuses: form.statuses,
@@ -98,6 +115,8 @@ function handleSubmit(): void {
   } catch (error: unknown) {
     formError.value = resolveErrorMessage(error);
     ToastService.error(formError.value);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
@@ -109,7 +128,9 @@ function goToGroups(): void {
   void router.push({ name: ROUTE_NAMES.ADMIN_GROUPS });
 }
 
-loadGroup();
+onMounted(() => {
+  void loadGroup();
+});
 </script>
 
 <template>
@@ -123,8 +144,10 @@ loadGroup();
       Volver al detalle
     </button>
 
+    <p v-if="isLoading" class="text-sm text-slate-500">Cargando grupo…</p>
+
     <div
-      v-if="!groupExists"
+      v-else-if="!groupExists"
       class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
     >
       <p class="text-sm text-slate-500">El grupo solicitado no existe.</p>
@@ -162,7 +185,9 @@ loadGroup();
 
         <div class="flex justify-end gap-3">
           <AppButton variant="ghost" type="button" @click="goBack">Cancelar</AppButton>
-          <AppButton type="submit">Guardar cambios</AppButton>
+          <AppButton type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Guardando…' : 'Guardar cambios' }}
+          </AppButton>
         </div>
       </form>
     </div>

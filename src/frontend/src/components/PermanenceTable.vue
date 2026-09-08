@@ -131,7 +131,7 @@ function rowClass(row: PermanenceRow): string {
                 type="number"
                 min="0"
                 :max="activity.weight"
-                step="0.5"
+                step="1"
                 :disabled="readonly"
                 class="w-16 rounded-md border border-transparent bg-white/70 px-2 py-1.5 text-right text-ink outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed"
                 @change="onValueInput(activity.id, row.member.id, $event)"

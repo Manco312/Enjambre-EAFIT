@@ -18,6 +18,10 @@ describe('PermanencesController', () => {
         {
           provide: PermanencesService,
           useValue: {
+            findAll: vi.fn(),
+            findByMember: vi.fn(),
+            findByActivity: vi.fn(),
+            findByGroup: vi.fn(),
             findById: vi.fn(),
             create: vi.fn(),
             update: vi.fn(),
@@ -29,6 +33,46 @@ describe('PermanencesController', () => {
 
     controller = module.get<PermanencesController>(PermanencesController);
     service = module.get<PermanencesService>(PermanencesService);
+  });
+
+  describe('findAll', () => {
+    const permanences = [{ id: 1, percentage: 80 }] as Permanence[];
+
+    it('should return every permanence when no query is given', async () => {
+      vi.spyOn(service, 'findAll').mockResolvedValue(permanences);
+
+      const result = await controller.findAll();
+
+      expect(service.findAll).toHaveBeenCalledWith();
+      expect(result).toBe(permanences);
+    });
+
+    it('should filter by memberId when provided', async () => {
+      vi.spyOn(service, 'findByMember').mockResolvedValue(permanences);
+
+      const result = await controller.findAll(5);
+
+      expect(service.findByMember).toHaveBeenCalledWith(5);
+      expect(result).toBe(permanences);
+    });
+
+    it('should filter by activityId when provided', async () => {
+      vi.spyOn(service, 'findByActivity').mockResolvedValue(permanences);
+
+      const result = await controller.findAll(undefined, 8);
+
+      expect(service.findByActivity).toHaveBeenCalledWith(8);
+      expect(result).toBe(permanences);
+    });
+
+    it('should filter by groupId when provided', async () => {
+      vi.spyOn(service, 'findByGroup').mockResolvedValue(permanences);
+
+      const result = await controller.findAll(undefined, undefined, 2);
+
+      expect(service.findByGroup).toHaveBeenCalledWith(2);
+      expect(result).toBe(permanences);
+    });
   });
 
   describe('findById', () => {

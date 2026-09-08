@@ -1,67 +1,69 @@
+import axios from 'axios';
+
 import type { CreateMemberStatusDTO } from '@/dtos/CreateMemberStatusDTO';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberStatusDTO } from '@/dtos/UpdateMemberStatusDTO';
+import { ENVIRONMENT } from '@/constants/environment';
 import { clampPercentage } from '@/utils/clampPercentage';
-import { generateId } from '@/utils/generateId';
-import { useMemberStatusStore } from '@/stores/memberstatusstore';
+
+const MEMBER_STATUSES_URL = `${ENVIRONMENT.API_URL}/member-statuses`;
 
 export class MemberStatusService {
-  public static getMemberStatuses(): MemberStatusInterface[] {
-    return useMemberStatusStore().memberStatuses;
+  public static async getMemberStatuses(): Promise<MemberStatusInterface[]> {
+    const { data } = await axios.get<MemberStatusInterface[]>(MEMBER_STATUSES_URL);
+    return data;
   }
 
-  public static getMemberStatusesByGroupId(groupId: number): MemberStatusInterface[] {
-    return useMemberStatusStore().memberStatuses.filter(
-      (status: MemberStatusInterface) => status.groupId === groupId,
-    );
+  public static async getMemberStatusesByGroupId(
+    groupId: number,
+  ): Promise<MemberStatusInterface[]> {
+    const { data } = await axios.get<MemberStatusInterface[]>(MEMBER_STATUSES_URL, {
+      params: { groupId },
+    });
+    return data;
   }
 
-  public static getMemberStatusById(id: number): Nullable<MemberStatusInterface> {
-    return (
-      useMemberStatusStore().memberStatuses.find(
-        (status: MemberStatusInterface) => status.id === id,
-      ) ?? null
-    );
+  public static async getMemberStatusById(id: number): Promise<Nullable<MemberStatusInterface>> {
+    try {
+      const { data } = await axios.get<MemberStatusInterface>(`${MEMBER_STATUSES_URL}/${id}`);
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
-  public static createMemberStatus(dto: CreateMemberStatusDTO): MemberStatusInterface {
-    const store = useMemberStatusStore();
-    const status: MemberStatusInterface = {
-      id: generateId(store.memberStatuses),
+  public static async createMemberStatus(
+    dto: CreateMemberStatusDTO,
+  ): Promise<MemberStatusInterface> {
+    const { data } = await axios.post<MemberStatusInterface>(MEMBER_STATUSES_URL, {
       name: dto.name.trim(),
       groupId: dto.groupId,
       target: clampPercentage(dto.target),
-    };
-    store.addMemberStatus(status);
-    return status;
+    });
+    return data;
   }
 
-  public static updateMemberStatus(id: number, dto: UpdateMemberStatusDTO): MemberStatusInterface {
-    const current = MemberStatusService.getMemberStatusById(id);
-    if (current === null) {
-      throw new Error('MEMBER_STATUS_NOT_FOUND');
-    }
-
-    const updated: MemberStatusInterface = {
-      ...current,
+  public static async updateMemberStatus(
+    id: number,
+    dto: UpdateMemberStatusDTO,
+  ): Promise<MemberStatusInterface> {
+    const payload: UpdateMemberStatusDTO = {
       ...dto,
-      name: (dto.name ?? current.name).trim(),
-      target: clampPercentage(dto.target ?? current.target),
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(dto.target !== undefined ? { target: clampPercentage(dto.target) } : {}),
     };
-    useMemberStatusStore().updateMemberStatus(updated);
-    return updated;
-  }
-
-  public static deleteMemberStatus(id: number): void {
-    useMemberStatusStore().removeMemberStatus(id);
-  }
-
-  public static deleteMemberStatusesByGroupId(groupId: number): void {
-    MemberStatusService.getMemberStatusesByGroupId(groupId).forEach(
-      (status: MemberStatusInterface) => {
-        MemberStatusService.deleteMemberStatus(status.id);
-      },
+    const { data } = await axios.patch<MemberStatusInterface>(
+      `${MEMBER_STATUSES_URL}/${id}`,
+      payload,
     );
+    return data;
+  }
+
+  public static async deleteMemberStatus(id: number): Promise<void> {
+    await axios.delete(`${MEMBER_STATUSES_URL}/${id}`);
   }
 }

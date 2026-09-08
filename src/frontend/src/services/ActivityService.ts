@@ -1,85 +1,72 @@
+import axios from 'axios';
+
 import type { ActivityInterface } from '@/interfaces/ActivityInterface';
 import type { CreateActivityDTO } from '@/dtos/CreateActivityDTO';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateActivityDTO } from '@/dtos/UpdateActivityDTO';
-import { PermanenceService } from '@/services/PermanenceService';
+import { ENVIRONMENT } from '@/constants/environment';
 import { clampPercentage } from '@/utils/clampPercentage';
-import { generateId } from '@/utils/generateId';
-import { useActivityStore } from '@/stores/activitystore';
+
+const ACTIVITIES_URL = `${ENVIRONMENT.API_URL}/activities`;
 
 export class ActivityService {
-  public static getActivitiesByGroupId(groupId: number): ActivityInterface[] {
-    return useActivityStore().activities.filter(
-      (activity: ActivityInterface) => activity.groupId === groupId,
-    );
+  public static async getActivitiesByGroupId(groupId: number): Promise<ActivityInterface[]> {
+    const { data } = await axios.get<ActivityInterface[]>(ACTIVITIES_URL, {
+      params: { groupId },
+    });
+    return data;
   }
 
-  public static getGeneralActivities(groupId: number): ActivityInterface[] {
-    return ActivityService.getActivitiesByGroupId(groupId).filter(
-      (activity: ActivityInterface) => activity.committeeId === null,
-    );
+  public static async getGeneralActivities(groupId: number): Promise<ActivityInterface[]> {
+    const activities = await ActivityService.getActivitiesByGroupId(groupId);
+    return activities.filter((activity: ActivityInterface) => activity.committeeId === null);
   }
 
-  public static getCommitteeActivities(committeeId: number): ActivityInterface[] {
-    return useActivityStore().activities.filter(
-      (activity: ActivityInterface) => activity.committeeId === committeeId,
-    );
+  public static async getCommitteeActivities(committeeId: number): Promise<ActivityInterface[]> {
+    const { data } = await axios.get<ActivityInterface[]>(ACTIVITIES_URL, {
+      params: { committeeId },
+    });
+    return data;
   }
 
-  public static getActivityById(id: number): Nullable<ActivityInterface> {
-    return (
-      useActivityStore().activities.find((activity: ActivityInterface) => activity.id === id) ??
-      null
-    );
+  public static async getActivityById(id: number): Promise<Nullable<ActivityInterface>> {
+    try {
+      const { data } = await axios.get<ActivityInterface>(`${ACTIVITIES_URL}/${id}`);
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
-  public static createActivity(dto: CreateActivityDTO): ActivityInterface {
-    const store = useActivityStore();
-    const activity: ActivityInterface = {
-      id: generateId(store.activities),
+  public static async createActivity(dto: CreateActivityDTO): Promise<ActivityInterface> {
+    const { data } = await axios.post<ActivityInterface>(ACTIVITIES_URL, {
       groupId: dto.groupId,
       committeeId: dto.committeeId,
       name: dto.name.trim(),
       description: dto.description.trim(),
       weight: clampPercentage(dto.weight),
-      period: dto.period.trim(),
-    };
-    store.addActivity(activity);
-    return activity;
-  }
-
-  public static updateActivity(id: number, dto: UpdateActivityDTO): ActivityInterface {
-    const store = useActivityStore();
-    const current = store.activities.find((activity: ActivityInterface) => activity.id === id);
-    if (current === undefined) {
-      throw new Error('ACTIVITY_NOT_FOUND');
-    }
-
-    const updated: ActivityInterface = {
-      ...current,
-      name: (dto.name ?? current.name).trim(),
-      description: (dto.description ?? current.description).trim(),
-      weight: clampPercentage(dto.weight ?? current.weight),
-      period: (dto.period ?? current.period).trim(),
-    };
-    store.updateActivity(updated);
-    return updated;
-  }
-
-  public static deleteActivity(id: number): void {
-    PermanenceService.deleteByActivityId(id);
-    useActivityStore().removeActivity(id);
-  }
-
-  public static deleteActivitiesByGroupId(groupId: number): void {
-    ActivityService.getActivitiesByGroupId(groupId).forEach((activity: ActivityInterface) => {
-      ActivityService.deleteActivity(activity.id);
     });
+    return data;
   }
 
-  public static deleteActivitiesByCommitteeId(committeeId: number): void {
-    ActivityService.getCommitteeActivities(committeeId).forEach((activity: ActivityInterface) => {
-      ActivityService.deleteActivity(activity.id);
-    });
+  public static async updateActivity(
+    id: number,
+    dto: UpdateActivityDTO,
+  ): Promise<ActivityInterface> {
+    const payload: UpdateActivityDTO = {
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
+      ...(dto.weight !== undefined ? { weight: clampPercentage(dto.weight) } : {}),
+    };
+    const { data } = await axios.patch<ActivityInterface>(`${ACTIVITIES_URL}/${id}`, payload);
+    return data;
+  }
+
+  // El backend borra en cascada las permanencias de la actividad.
+  public static async deleteActivity(id: number): Promise<void> {
+    await axios.delete(`${ACTIVITIES_URL}/${id}`);
   }
 }

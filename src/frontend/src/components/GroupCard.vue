@@ -6,7 +6,6 @@ import type { GroupInterface } from '@/interfaces/GroupInterface';
 const props = defineProps<{
   group: GroupInterface;
   committeeCount: number;
-  boardUsername: string;
 }>();
 
 /* Emits */
@@ -60,10 +59,6 @@ function handleDelete(): void {
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-sitemap w-4 text-center text-slate-400" />
         <span>{{ committeeCount }} comité(s) / departamento(s)</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-user-shield w-4 text-center text-slate-400" />
-        <span>Junta: {{ boardUsername || 'sin cuenta' }}</span>
       </div>
     </dl>
 

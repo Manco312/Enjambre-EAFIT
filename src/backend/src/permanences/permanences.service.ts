@@ -21,6 +21,28 @@ export class PermanencesService {
     private readonly activitiesService: ActivitiesService,
   ) {}
 
+  async findAll(): Promise<Permanence[]> {
+    return await this.permanencesRepository.find();
+  }
+
+  async findByMember(memberId: number): Promise<Permanence[]> {
+    return await this.permanencesRepository.find({
+      where: { member: { id: memberId } },
+    });
+  }
+
+  async findByActivity(activityId: number): Promise<Permanence[]> {
+    return await this.permanencesRepository.find({
+      where: { activity: { id: activityId } },
+    });
+  }
+
+  async findByGroup(groupId: number): Promise<Permanence[]> {
+    return await this.permanencesRepository.find({
+      where: { activity: { group: { id: groupId } } },
+    });
+  }
+
   async findById(id: number): Promise<Permanence> {
     const permanence = await this.permanencesRepository.findOneBy({ id });
 

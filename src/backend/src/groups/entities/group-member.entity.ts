@@ -3,6 +3,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  RelationId,
   Unique,
   CreateDateColumn,
   UpdateDateColumn,
@@ -24,6 +25,9 @@ export class GroupMember {
   @JoinColumn({ referencedColumnName: 'id' })
   member: Member;
 
+  @RelationId((groupMember: GroupMember) => groupMember.member)
+  memberId: number;
+
   @ManyToOne(() => Group, (group) => group.groupMembers, {
     eager: true,
     onDelete: 'CASCADE',
@@ -31,11 +35,17 @@ export class GroupMember {
   @JoinColumn({ referencedColumnName: 'id' })
   group: Group;
 
+  @RelationId((groupMember: GroupMember) => groupMember.group)
+  groupId: number;
+
   @ManyToOne(() => MemberStatus, (memberStatus) => memberStatus.groupMembers, {
     eager: true,
   })
   @JoinColumn({ referencedColumnName: 'id' })
   memberStatus: MemberStatus;
+
+  @RelationId((groupMember: GroupMember) => groupMember.memberStatus)
+  memberStatusId: number;
 
   @CreateDateColumn()
   createdAt: Date;

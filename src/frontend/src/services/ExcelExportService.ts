@@ -1,6 +1,7 @@
+import type { MemberLookups, MemberWithMembership } from '@/services/MemberService';
 import type { PermanenceRow, PermanenceSheetOption } from '@/services/PermanenceSheetService';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
-import { MemberService, type MemberWithMembership } from '@/services/MemberService';
+import { MemberService } from '@/services/MemberService';
 import { PermanenceSheetService } from '@/services/PermanenceSheetService';
 
 type CellValue = string | number;
@@ -9,12 +10,13 @@ export class ExcelExportService {
   public static async buildMembersBlob(
     members: MemberWithMembership[],
     sheetName: string,
+    lookups: MemberLookups,
   ): Promise<Blob> {
     const XLSX = await import('xlsx');
 
     const header = MEMBER_COLUMNS.map((column) => column.header);
     const body = members.map((member: MemberWithMembership) =>
-      MEMBER_COLUMNS.map((column) => MemberService.fieldToText(member, column.key)),
+      MEMBER_COLUMNS.map((column) => MemberService.fieldToText(member, column.key, lookups)),
     );
 
     const workbook = XLSX.utils.book_new();
@@ -29,8 +31,10 @@ export class ExcelExportService {
     const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
 
-    PermanenceSheetService.getSheetOptions(groupId).forEach((option: PermanenceSheetOption) => {
-      const sheet = PermanenceSheetService.buildSheet(groupId, option.key);
+    const options: PermanenceSheetOption[] = await PermanenceSheetService.getSheetOptions(groupId);
+
+    for (const option of options) {
+      const sheet = await PermanenceSheetService.buildSheet(groupId, option.key);
 
       const header: CellValue[] = ['Integrante', 'Estado'];
       sheet.activityColumns.forEach((activity) => {
@@ -60,7 +64,7 @@ export class ExcelExportService {
         worksheet,
         ExcelExportService.safeSheetName(option.label),
       );
-    });
+    }
 
     return ExcelExportService.toBlob(XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }));
   }

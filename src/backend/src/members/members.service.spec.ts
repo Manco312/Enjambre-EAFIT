@@ -66,6 +66,21 @@ describe('MembersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('findByGroup', () => {
+    it('should filter members by their group membership', async () => {
+      const members = [{ id: 1, fullName: 'Juan Pérez' }] as Member[];
+
+      vi.spyOn(repository, 'find').mockResolvedValue(members);
+
+      const result = await service.findByGroup(2);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { groupMembers: { group: { id: 2 } } },
+      });
+      expect(result).toBe(members);
+    });
+  });
+
   describe('findById', () => {
     it('should return a member when it exists', async () => {
       const member = { id: 1, fullName: 'Juan Pérez' } as Member;

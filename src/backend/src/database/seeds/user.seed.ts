@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { AppDataSource } from '../data-source.js';
 import { User } from '../../users/entities/user.entity.js';
 import { Group } from '../../groups/entities/group.entity.js';
+import { USER_ROLES } from '../../auth/roles.js';
 
 export async function seedUsers() {
   const userRepository = AppDataSource.getRepository(User);
@@ -21,13 +22,13 @@ export async function seedUsers() {
     {
       username: process.env.ADMIN_USERNAME,
       password: process.env.ADMIN_PASSWORD,
-      role: 'admin',
+      role: USER_ROLES.ADMIN,
       group: null,
     },
     {
       username: process.env.BOARD_USERNAME,
       password: process.env.BOARD_PASSWORD,
-      role: 'board',
+      role: USER_ROLES.BOARD,
       group: boardGroup,
     },
   ];

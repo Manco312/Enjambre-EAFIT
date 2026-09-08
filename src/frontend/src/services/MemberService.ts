@@ -1,128 +1,113 @@
+import axios from 'axios';
+
+import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateMemberDTO } from '@/dtos/CreateMemberDTO';
 import type { MemberInterface } from '@/interfaces/MemberInterface';
+import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
-import { CommitteeService } from '@/services/CommitteeService';
-import { DOCUMENT_TYPES } from '@/constants/documentTypes';
+import { ENVIRONMENT } from '@/constants/environment';
 import { GroupMemberService } from '@/services/GroupMemberService';
-import { MemberStatusService } from '@/services/MemberStatusService';
-import { PermanenceService } from '@/services/PermanenceService';
-import { generateId } from '@/utils/generateId';
-import { useMemberStore } from '@/stores/memberstore';
 
 export type MemberWithMembership = MemberInterface & { memberStatusId: number };
+
+export interface MemberLookups {
+  committees: CommitteeInterface[];
+  statuses: MemberStatusInterface[];
+}
 
 export interface MemberFilterCriteria {
   search: string;
   columnFilters: Partial<Record<string, string>>;
 }
 
+interface GroupMemberWithMember {
+  id: number;
+  memberId: number;
+  groupId: number;
+  memberStatusId: number;
+  member: MemberInterface;
+}
+
+const MEMBERS_URL = `${ENVIRONMENT.API_URL}/members`;
+const GROUP_MEMBERS_URL = `${ENVIRONMENT.API_URL}/group-members`;
+
 export class MemberService {
-  public static getMembers(): MemberInterface[] {
-    return useMemberStore().members;
+  public static async getMembers(): Promise<MemberInterface[]> {
+    const { data } = await axios.get<MemberInterface[]>(MEMBERS_URL);
+    return data;
   }
 
-  public static getMembersByGroupId(groupId: number): MemberWithMembership[] {
-    return GroupMemberService.getByGroupId(groupId)
-      .map((groupMember) => {
-        const member = MemberService.getMemberById(groupMember.memberId);
-        return member === null ? null : { ...member, memberStatusId: groupMember.memberStatusId };
-      })
-      .filter((member): member is MemberWithMembership => member !== null);
-  }
-
-  public static getMemberById(id: number): Nullable<MemberInterface> {
-    return useMemberStore().members.find((member: MemberInterface) => member.id === id) ?? null;
-  }
-
-  public static createMember(dto: CreateMemberDTO): MemberWithMembership {
-    const store = useMemberStore();
-    const { groupId, memberStatusId, ...memberFields } = dto;
-    const member: MemberInterface = { id: generateId(store.members), ...memberFields };
-    store.addMember(member);
-    GroupMemberService.create({ memberId: member.id, groupId, memberStatusId });
-    return { ...member, memberStatusId };
-  }
-
-  public static createBlankMember(groupId: number, memberStatusId: number): MemberWithMembership {
-    return MemberService.createMember({
-      groupId,
-      memberStatusId,
-      idEpik: 0,
-      fullName: '',
-      documentType: DOCUMENT_TYPES.CC,
-      documentNumber: '',
-      email: '',
-      phone: '',
-      program: '',
-      secondProgram: '',
-      committeeIds: [],
+  public static async getMembersByGroupId(groupId: number): Promise<MemberWithMembership[]> {
+    const { data } = await axios.get<GroupMemberWithMember[]>(GROUP_MEMBERS_URL, {
+      params: { groupId },
     });
+    return data.map((groupMember) => ({
+      ...groupMember.member,
+      memberStatusId: groupMember.memberStatusId,
+    }));
   }
 
-  public static updateMember(id: number, dto: UpdateMemberDTO): MemberInterface {
-    const current = MemberService.getMemberById(id);
-    if (current === null) {
-      throw new Error('MEMBER_NOT_FOUND');
+  public static async getMemberById(id: number): Promise<Nullable<MemberInterface>> {
+    try {
+      const { data } = await axios.get<MemberInterface>(`${MEMBERS_URL}/${id}`);
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
     }
-
-    const updated: MemberInterface = { ...current, ...dto };
-    useMemberStore().updateMember(updated);
-    return updated;
   }
 
-  public static updateMemberStatus(
+  public static async createMember(dto: CreateMemberDTO): Promise<MemberWithMembership> {
+    const { data } = await axios.post<MemberInterface>(MEMBERS_URL, dto);
+    return { ...data, memberStatusId: dto.memberStatusId };
+  }
+
+  public static async updateMember(id: number, dto: UpdateMemberDTO): Promise<MemberInterface> {
+    const { data } = await axios.patch<MemberInterface>(`${MEMBERS_URL}/${id}`, dto);
+    return data;
+  }
+
+  public static async updateMemberStatus(
     memberId: number,
     groupId: number,
     memberStatusId: number,
-  ): void {
-    GroupMemberService.updateStatus(memberId, groupId, memberStatusId);
+  ): Promise<void> {
+    await GroupMemberService.updateStatus(memberId, groupId, memberStatusId);
   }
 
-  public static deleteMember(id: number): void {
-    PermanenceService.deleteByMemberId(id);
-    GroupMemberService.deleteByMemberId(id);
-    useMemberStore().removeMember(id);
-  }
-
-  public static deleteMembersByGroupId(groupId: number): void {
-    MemberService.getMembersByGroupId(groupId).forEach((member: MemberWithMembership) => {
-      MemberService.deleteMember(member.id);
-    });
-  }
-
-  public static removeCommitteeFromMembers(committeeId: number): void {
-    useMemberStore().members.forEach((member: MemberInterface) => {
-      if (member.committeeIds.includes(committeeId)) {
-        MemberService.updateMember(member.id, {
-          committeeIds: member.committeeIds.filter((id: number) => id !== committeeId),
-        });
-      }
-    });
+  public static async deleteMember(id: number): Promise<void> {
+    await axios.delete(`${MEMBERS_URL}/${id}`);
   }
 
   public static getDisplayName(member: MemberInterface): string {
     return member.fullName || member.email || 'Sin nombre';
   }
 
-  public static getCommitteeNames(member: MemberInterface): string[] {
+  public static getCommitteeNames(
+    member: MemberInterface,
+    committees: CommitteeInterface[],
+  ): string[] {
     return member.committeeIds
-      .map((id: number) => CommitteeService.getCommitteeById(id)?.name)
-      .filter((name): name is string => name !== undefined && name !== null);
+      .map((id: number) => committees.find((committee) => committee.id === id)?.name)
+      .filter((name): name is string => name !== undefined);
   }
 
-  public static getStatusName(memberStatusId: number): string {
-    return MemberStatusService.getMemberStatusById(memberStatusId)?.name ?? '—';
+  public static getStatusName(memberStatusId: number, statuses: MemberStatusInterface[]): string {
+    return statuses.find((status) => status.id === memberStatusId)?.name ?? '—';
   }
 
   public static filterMembers(
     members: MemberWithMembership[],
     criteria: MemberFilterCriteria,
+    lookups: MemberLookups,
   ): MemberWithMembership[] {
     const search = criteria.search.trim().toLowerCase();
 
     return members.filter((member: MemberWithMembership) => {
-      if (search.length > 0 && !MemberService.memberMatchesText(member, search)) {
+      if (search.length > 0 && !MemberService.memberMatchesText(member, search, lookups)) {
         return false;
       }
 
@@ -132,19 +117,25 @@ export class MemberService {
           if (value.length === 0) {
             return true;
           }
-          return MemberService.fieldToText(member, key).toLowerCase().includes(value);
+          return MemberService.fieldToText(member, key, lookups).toLowerCase().includes(value);
         },
       );
     });
   }
 
-  public static fieldToText(member: MemberWithMembership | MemberInterface, key: string): string {
+  public static fieldToText(
+    member: MemberWithMembership | MemberInterface,
+    key: string,
+    lookups: MemberLookups,
+  ): string {
     if (key === 'memberStatusId') {
       const memberStatusId = (member as MemberWithMembership).memberStatusId;
-      return memberStatusId === undefined ? '' : MemberService.getStatusName(memberStatusId);
+      return memberStatusId === undefined
+        ? ''
+        : MemberService.getStatusName(memberStatusId, lookups.statuses);
     }
     if (key === 'committeeIds') {
-      return MemberService.getCommitteeNames(member).join('; ');
+      return MemberService.getCommitteeNames(member, lookups.committees).join('; ');
     }
     if (key === 'idEpik') {
       return String(member.idEpik);
@@ -157,16 +148,23 @@ export class MemberService {
     return String(value ?? '');
   }
 
-  private static memberMatchesText(member: MemberWithMembership, loweredSearch: string): boolean {
-    return (
-      MemberService.fieldToText(member, 'email').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'fullName').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'idEpik').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'documentNumber').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'program').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'secondProgram').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'memberStatusId').toLowerCase().includes(loweredSearch) ||
-      MemberService.fieldToText(member, 'committeeIds').toLowerCase().includes(loweredSearch)
+  private static memberMatchesText(
+    member: MemberWithMembership,
+    loweredSearch: string,
+    lookups: MemberLookups,
+  ): boolean {
+    const keys = [
+      'email',
+      'fullName',
+      'idEpik',
+      'documentNumber',
+      'program',
+      'secondProgram',
+      'memberStatusId',
+      'committeeIds',
+    ];
+    return keys.some((key) =>
+      MemberService.fieldToText(member, key, lookups).toLowerCase().includes(loweredSearch),
     );
   }
 }

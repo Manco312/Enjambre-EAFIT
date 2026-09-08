@@ -23,6 +23,7 @@ describe('ActivitiesService', () => {
         {
           provide: getRepositoryToken(Activity),
           useValue: {
+            find: vi.fn(),
             findOneBy: vi.fn(),
             create: vi.fn(),
             save: vi.fn(),
@@ -59,6 +60,41 @@ describe('ActivitiesService', () => {
   // Test inicial
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('list helpers', () => {
+    const activities = [{ id: 1, name: 'Activity 1' }] as Activity[];
+
+    it('findAll should return every activity', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(activities);
+
+      const result = await service.findAll();
+
+      expect(repository.find).toHaveBeenCalledWith();
+      expect(result).toBe(activities);
+    });
+
+    it('findByGroup should filter by group id', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(activities);
+
+      const result = await service.findByGroup(3);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { group: { id: 3 } },
+      });
+      expect(result).toBe(activities);
+    });
+
+    it('findByCommittee should filter by committee id', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(activities);
+
+      const result = await service.findByCommittee(7);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { committee: { id: 7 } },
+      });
+      expect(result).toBe(activities);
+    });
   });
 
   // Test 1

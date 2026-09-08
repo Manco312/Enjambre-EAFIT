@@ -41,7 +41,9 @@ export function validateMemberForm(form: MemberFormValues): MemberFormErrors {
     errors.documentNumber = 'El número de documento es obligatorio.';
   }
 
-  if (form.phone.trim().length > 0 && !/^\d{7,15}$/.test(form.phone.trim())) {
+  if (form.phone.trim().length === 0) {
+    errors.phone = 'El celular es obligatorio.';
+  } else if (!/^\d{7,15}$/.test(form.phone.trim())) {
     errors.phone = 'El celular debe tener entre 7 y 15 dígitos.';
   }
 

@@ -1,57 +1,46 @@
+import axios from 'axios';
+
 import type { PermanenceInterface } from '@/interfaces/PermanenceInterface';
 import type { SetPermanenceDTO } from '@/dtos/SetPermanenceDTO';
-import { generateId } from '@/utils/generateId';
-import { usePermanenceStore } from '@/stores/permanencestore';
+import { ENVIRONMENT } from '@/constants/environment';
+
+const PERMANENCES_URL = `${ENVIRONMENT.API_URL}/permanences`;
 
 export class PermanenceService {
-  public static getByActivityId(activityId: number): PermanenceInterface[] {
-    return usePermanenceStore().permanences.filter(
-      (permanence: PermanenceInterface) => permanence.activityId === activityId,
-    );
+  public static async getByActivityId(activityId: number): Promise<PermanenceInterface[]> {
+    const { data } = await axios.get<PermanenceInterface[]>(PERMANENCES_URL, {
+      params: { activityId },
+    });
+    return data;
   }
 
-  public static getPercentage(activityId: number, memberId: number): number {
-    return (
-      usePermanenceStore().permanences.find(
-        (permanence: PermanenceInterface) =>
-          permanence.activityId === activityId && permanence.memberId === memberId,
-      )?.percentage ?? 0
-    );
+  public static async getByGroupId(groupId: number): Promise<PermanenceInterface[]> {
+    const { data } = await axios.get<PermanenceInterface[]>(PERMANENCES_URL, {
+      params: { groupId },
+    });
+    return data;
   }
 
-  public static setPercentage(dto: SetPermanenceDTO): PermanenceInterface {
-    const store = usePermanenceStore();
-    const percentage = Math.max(0, dto.percentage);
-    const existing = store.permanences.find(
-      (permanence: PermanenceInterface) =>
-        permanence.activityId === dto.activityId && permanence.memberId === dto.memberId,
+  // Upsert: si ya existe una permanencia para (actividad, miembro) la actualiza;
+  // si no, la crea.
+  public static async setPercentage(dto: SetPermanenceDTO): Promise<PermanenceInterface> {
+    const percentage = Math.max(0, Math.round(dto.percentage));
+    const existing = (await PermanenceService.getByActivityId(dto.activityId)).find(
+      (permanence: PermanenceInterface) => permanence.memberId === dto.memberId,
     );
 
     if (existing !== undefined) {
-      const updated: PermanenceInterface = { ...existing, percentage };
-      store.updatePermanence(updated);
-      return updated;
+      const { data } = await axios.patch<PermanenceInterface>(`${PERMANENCES_URL}/${existing.id}`, {
+        percentage,
+      });
+      return data;
     }
 
-    const created: PermanenceInterface = {
-      id: generateId(store.permanences),
+    const { data } = await axios.post<PermanenceInterface>(PERMANENCES_URL, {
       activityId: dto.activityId,
       memberId: dto.memberId,
       percentage,
-    };
-    store.addPermanence(created);
-    return created;
-  }
-
-  public static deleteByActivityId(activityId: number): void {
-    usePermanenceStore().removePermanences(
-      (permanence: PermanenceInterface) => permanence.activityId === activityId,
-    );
-  }
-
-  public static deleteByMemberId(memberId: number): void {
-    usePermanenceStore().removePermanences(
-      (permanence: PermanenceInterface) => permanence.memberId === memberId,
-    );
+    });
+    return data;
   }
 }

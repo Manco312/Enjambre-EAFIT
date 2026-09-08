@@ -5,6 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryGeneratedColumn,
+  RelationId,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -36,6 +37,9 @@ export class Activity {
   @JoinColumn({ referencedColumnName: 'id' })
   group: Group;
 
+  @RelationId((activity: Activity) => activity.group)
+  groupId: number;
+
   @ManyToOne(() => Committee, (committee) => committee.activities, {
     eager: true,
     nullable: true,
@@ -43,6 +47,9 @@ export class Activity {
   })
   @JoinColumn({ referencedColumnName: 'id' })
   committee: Committee | null;
+
+  @RelationId((activity: Activity) => activity.committee)
+  committeeId: number | null;
 
   @OneToMany('Permanence', 'activity')
   permanences: Permanence[];

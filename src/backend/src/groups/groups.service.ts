@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeleteResult, Not } from 'typeorm';
 
 import { Group } from './entities/group.entity.js';
+import { GroupMember } from './entities/group-member.entity.js';
+import { Member } from '../members/entities/member.entity.js';
 import { CreateGroupDto } from './dto/create-group.dto.js';
 import { UpdateGroupDto } from './dto/update-group.dto.js';
 
@@ -57,7 +59,26 @@ export class GroupsService {
   }
 
   async remove(id: number): Promise<DeleteResult> {
-    return await this.groupsRepository.delete(id);
+    return await this.groupsRepository.manager.transaction(async (manager) => {
+      const links = await manager.find(GroupMember, {
+        where: { group: { id } },
+        relations: { member: true },
+      });
+
+      await manager.delete(GroupMember, { group: { id } });
+
+      for (const { member } of links) {
+        const stillLinked = await manager.count(GroupMember, {
+          where: { member: { id: member.id } },
+        });
+
+        if (stillLinked === 0) {
+          await manager.delete(Member, member.id);
+        }
+      }
+
+      return await manager.delete(Group, id);
+    });
   }
 
   private async ensureNameIsAvailable(

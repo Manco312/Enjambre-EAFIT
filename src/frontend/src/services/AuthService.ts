@@ -1,35 +1,57 @@
+import axios from 'axios';
+import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router';
+
 import type { AuthSessionInterface } from '@/interfaces/AuthSessionInterface';
 import type { LoginDTO } from '@/dtos/LoginDTO';
 import type { Nullable } from '@/types/Nullable';
-import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router';
-import type { UserInterface } from '@/interfaces/UserInterface';
 import type { UserRole } from '@/types/UserRole';
 import { DomainError } from '@/utils/DomainError';
+import { ENVIRONMENT } from '@/constants/environment';
 import { ROUTE_NAMES } from '@/constants/routeNames';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { USER_ROLES } from '@/constants/roles';
-import { UserService } from '@/services/UserService';
 import { useAuthStore } from '@/stores/authstore';
 
-export class AuthService {
-  public static login(dto: LoginDTO): AuthSessionInterface {
-    const user: Nullable<UserInterface> = UserService.getUserByUsername(dto.username);
+interface LoginResponse {
+  access_token: string;
+}
 
-    if (user === null || user.password !== dto.password) {
+const AUTH_URL = `${ENVIRONMENT.API_URL}/auth`;
+
+export class AuthService {
+  public static async login(dto: LoginDTO): Promise<AuthSessionInterface> {
+    let token: string;
+    try {
+      const { data } = await axios.post<LoginResponse>(`${AUTH_URL}/login`, dto);
+      token = data.access_token;
+    } catch {
       throw new DomainError('INVALID_CREDENTIALS');
     }
 
-    const session: AuthSessionInterface = {
-      userId: user.id,
-      username: user.username,
-      role: user.role,
-      groupId: user.groupId,
-    };
-
+    AuthService.applyToken(token);
+    const session = await AuthService.fetchSession();
     useAuthStore().setSession(session);
     return session;
   }
 
+  // Rehidrata la sesión al arrancar la app a partir del token guardado.
+  public static async bootstrapSession(): Promise<void> {
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    if (token === null) {
+      return;
+    }
+
+    AuthService.applyToken(token);
+    try {
+      useAuthStore().setSession(await AuthService.fetchSession());
+    } catch {
+      AuthService.clearToken();
+      useAuthStore().setSession(null);
+    }
+  }
+
   public static logout(): void {
+    AuthService.clearToken();
     useAuthStore().setSession(null);
   }
 
@@ -77,5 +99,20 @@ export class AuthService {
     }
 
     return true;
+  }
+
+  private static async fetchSession(): Promise<AuthSessionInterface> {
+    const { data } = await axios.get<AuthSessionInterface>(`${AUTH_URL}/me`);
+    return data;
+  }
+
+  private static applyToken(token: string): void {
+    localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+  }
+
+  private static clearToken(): void {
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    delete axios.defaults.headers.common.Authorization;
   }
 }

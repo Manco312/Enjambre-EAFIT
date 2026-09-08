@@ -2,6 +2,7 @@ import {
   Controller,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   Get,
   Post,
@@ -18,6 +19,28 @@ import { UpdatePermanenceDto } from './dto/update-permanence.dto.js';
 @Controller('permanences')
 export class PermanencesController {
   constructor(private readonly permanencesService: PermanencesService) {}
+
+  @Get()
+  async findAll(
+    @Query('memberId', new ParseIntPipe({ optional: true })) memberId?: number,
+    @Query('activityId', new ParseIntPipe({ optional: true }))
+    activityId?: number,
+    @Query('groupId', new ParseIntPipe({ optional: true })) groupId?: number,
+  ): Promise<Permanence[]> {
+    if (memberId !== undefined) {
+      return await this.permanencesService.findByMember(memberId);
+    }
+
+    if (activityId !== undefined) {
+      return await this.permanencesService.findByActivity(activityId);
+    }
+
+    if (groupId !== undefined) {
+      return await this.permanencesService.findByGroup(groupId);
+    }
+
+    return await this.permanencesService.findAll();
+  }
 
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number): Promise<Permanence> {

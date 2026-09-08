@@ -14,7 +14,6 @@ export interface ActivityFormPayload {
   name: string;
   description: string;
   weight: number;
-  period: string;
 }
 
 interface ActivityFormErrors {
@@ -37,7 +36,6 @@ const form = reactive<ActivityFormPayload>({
   name: '',
   description: '',
   weight: 0,
-  period: '',
 });
 const errors = ref<ActivityFormErrors>({});
 
@@ -56,12 +54,10 @@ watch(
       form.name = props.activity.name;
       form.description = props.activity.description;
       form.weight = props.activity.weight;
-      form.period = props.activity.period;
     } else {
       form.name = '';
       form.description = '';
       form.weight = 0;
-      form.period = '';
     }
   },
 );
@@ -91,7 +87,6 @@ function handleSubmit(): void {
     name: form.name,
     description: form.description,
     weight: form.weight,
-    period: form.period,
   });
 }
 
@@ -149,31 +144,23 @@ function handleClose(): void {
             />
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="space-y-1.5">
-              <label for="activity-weight" class="block text-sm font-semibold text-slate-700">
-                Peso (%) <span class="text-red-500">*</span>
-              </label>
-              <input
-                id="activity-weight"
-                :value="form.weight"
-                type="number"
-                min="0"
-                max="100"
-                class="w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                :class="errors.weight ? 'border-red-400' : 'border-slate-300'"
-                @input="onWeightInput"
-              />
-              <p v-if="errors.weight" class="text-xs font-medium text-red-500">
-                {{ errors.weight }}
-              </p>
-            </div>
-            <AppTextField
-              id="activity-period"
-              v-model="form.period"
-              label="Periodo"
-              placeholder="Ej: 2026-1"
+          <div class="space-y-1.5">
+            <label for="activity-weight" class="block text-sm font-semibold text-slate-700">
+              Peso (%) <span class="text-red-500">*</span>
+            </label>
+            <input
+              id="activity-weight"
+              :value="form.weight"
+              type="number"
+              min="0"
+              max="100"
+              class="w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              :class="errors.weight ? 'border-red-400' : 'border-slate-300'"
+              @input="onWeightInput"
             />
+            <p v-if="errors.weight" class="text-xs font-medium text-red-500">
+              {{ errors.weight }}
+            </p>
           </div>
 
           <AlertBanner

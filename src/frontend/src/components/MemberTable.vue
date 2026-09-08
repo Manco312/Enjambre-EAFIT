@@ -1,10 +1,13 @@
 <script setup lang="ts">
+/* External Imports */
+import { computed } from 'vue';
+
 /* Internal Imports */
 import MultiSelect from '@/components/MultiSelect.vue';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { DocumentType } from '@/types/DocumentType';
+import type { MemberLookups, MemberWithMembership } from '@/services/MemberService';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
-import type { MemberWithMembership } from '@/services/MemberService';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
@@ -30,9 +33,15 @@ const emit = defineEmits<{
   filterChange: [key: string, value: string];
 }>();
 
+/* Selectors */
+const lookups = computed<MemberLookups>(() => ({
+  committees: props.committees,
+  statuses: props.statuses,
+}));
+
 /* Functions */
 function cellText(member: MemberWithMembership, key: string): string {
-  return MemberService.fieldToText(member, key);
+  return MemberService.fieldToText(member, key, lookups.value);
 }
 
 function filterValue(key: string): string {
@@ -61,7 +70,7 @@ function onStatusChange(member: MemberWithMembership, event: Event): void {
 }
 
 function committeeNames(member: MemberWithMembership): string[] {
-  return MemberService.getCommitteeNames(member);
+  return MemberService.getCommitteeNames(member, props.committees);
 }
 
 function onAreasChange(member: MemberWithMembership, names: string[]): void {

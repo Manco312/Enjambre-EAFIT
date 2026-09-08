@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* External Imports */
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
@@ -11,9 +11,8 @@ import MemberTable from '@/components/MemberTable.vue';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateMemberDTO } from '@/dtos/CreateMemberDTO';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
-import type { MemberInterface } from '@/interfaces/MemberInterface';
+import type { MemberLookups, MemberWithMembership } from '@/services/MemberService';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
-import type { MemberWithMembership } from '@/services/MemberService';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { AuthService } from '@/services/AuthService';
@@ -25,6 +24,7 @@ import { MemberStatusService } from '@/services/MemberStatusService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { downloadBlob } from '@/utils/downloadBlob';
+import { resolveErrorMessage } from '@/utils/resolveErrorMessage';
 import { slugify } from '@/utils/slugify';
 
 /* Types */
@@ -41,7 +41,13 @@ const columnFilters = reactive<ColumnFilters>({});
 const page = ref<number>(1);
 const isFormOpen = ref<boolean>(false);
 const isExporting = ref<boolean>(false);
-const memberPendingDelete = ref<Nullable<MemberInterface>>(null);
+const isLoading = ref<boolean>(true);
+const memberPendingDelete = ref<Nullable<MemberWithMembership>>(null);
+
+const group = ref<Nullable<GroupInterface>>(null);
+const allMembers = ref<MemberWithMembership[]>([]);
+const committees = ref<CommitteeInterface[]>([]);
+const statuses = ref<MemberStatusInterface[]>([]);
 
 /* Selectors */
 const isAdminRoute = computed<boolean>(() => route.name === ROUTE_NAMES.ADMIN_GROUP_MEMBERS);
@@ -53,24 +59,17 @@ const groupId = computed<Nullable<number>>(() => {
   return AuthService.getSession()?.groupId ?? null;
 });
 
-const group = computed<Nullable<GroupInterface>>(() =>
-  groupId.value === null ? null : GroupService.getGroupById(groupId.value),
-);
-
-const allMembers = computed<MemberWithMembership[]>(() =>
-  groupId.value === null ? [] : MemberService.getMembersByGroupId(groupId.value),
-);
-
-const committees = computed<CommitteeInterface[]>(() =>
-  groupId.value === null ? [] : CommitteeService.getCommitteesByGroupId(groupId.value),
-);
-
-const statuses = computed<MemberStatusInterface[]>(() =>
-  groupId.value === null ? [] : MemberStatusService.getMemberStatusesByGroupId(groupId.value),
-);
+const lookups = computed<MemberLookups>(() => ({
+  committees: committees.value,
+  statuses: statuses.value,
+}));
 
 const filteredMembers = computed<MemberWithMembership[]>(() =>
-  MemberService.filterMembers(allMembers.value, { search: search.value, columnFilters }),
+  MemberService.filterMembers(
+    allMembers.value,
+    { search: search.value, columnFilters },
+    lookups.value,
+  ),
 );
 
 const totalPages = computed<number>(() =>
@@ -89,7 +88,36 @@ watch(totalPages, (nextTotal: number): void => {
   }
 });
 
+watch(groupId, () => {
+  void load();
+});
+
 /* Functions */
+async function load(): Promise<void> {
+  if (groupId.value === null) {
+    isLoading.value = false;
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    const [foundGroup, members, foundCommittees, foundStatuses] = await Promise.all([
+      GroupService.getGroupById(groupId.value),
+      MemberService.getMembersByGroupId(groupId.value),
+      CommitteeService.getCommitteesByGroupId(groupId.value),
+      MemberStatusService.getMemberStatusesByGroupId(groupId.value),
+    ]);
+    group.value = foundGroup;
+    allMembers.value = members;
+    committees.value = foundCommittees;
+    statuses.value = foundStatuses;
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 function resetToFirstPage(): void {
   page.value = 1;
 }
@@ -104,47 +132,70 @@ function onFilterChange(key: string, value: string): void {
   resetToFirstPage();
 }
 
-function onMemberUpdate(id: number, dto: UpdateMemberDTO): void {
-  MemberService.updateMember(id, dto);
-  ToastService.success('Cambios guardados.', 'member-inline-save');
+function patchLocalMember(id: number, changes: Partial<MemberWithMembership>): void {
+  allMembers.value = allMembers.value.map((member: MemberWithMembership) =>
+    member.id === id ? { ...member, ...changes } : member,
+  );
 }
 
-function onMemberStatusUpdate(id: number, memberStatusId: number): void {
+async function onMemberUpdate(id: number, dto: UpdateMemberDTO): Promise<void> {
+  try {
+    await MemberService.updateMember(id, dto);
+    patchLocalMember(id, dto as Partial<MemberWithMembership>);
+    ToastService.success('Cambios guardados.', 'member-inline-save');
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error), 'member-inline-save');
+    void load();
+  }
+}
+
+async function onMemberStatusUpdate(id: number, memberStatusId: number): Promise<void> {
   if (groupId.value === null) {
     return;
   }
-  MemberService.updateMemberStatus(id, groupId.value, memberStatusId);
-  ToastService.success('Cambios guardados.', 'member-inline-save');
+  try {
+    await MemberService.updateMemberStatus(id, groupId.value, memberStatusId);
+    patchLocalMember(id, { memberStatusId });
+    ToastService.success('Cambios guardados.', 'member-inline-save');
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error), 'member-inline-save');
+    void load();
+  }
 }
 
 function requestMemberDelete(id: number): void {
-  memberPendingDelete.value = MemberService.getMemberById(id);
+  memberPendingDelete.value =
+    allMembers.value.find((member: MemberWithMembership) => member.id === id) ?? null;
 }
 
-function confirmMemberDelete(): void {
-  if (memberPendingDelete.value !== null) {
-    const label = MemberService.getDisplayName(memberPendingDelete.value);
-    MemberService.deleteMember(memberPendingDelete.value.id);
-    ToastService.success(`«${label}» eliminado de la base de datos.`);
-  }
+async function confirmMemberDelete(): Promise<void> {
+  const target = memberPendingDelete.value;
   memberPendingDelete.value = null;
-}
-
-function addRowInline(): void {
-  const firstStatus = statuses.value[0];
-  if (groupId.value === null || firstStatus === undefined) {
+  if (target === null) {
     return;
   }
-  MemberService.createBlankMember(groupId.value, firstStatus.id);
-  page.value = totalPages.value;
-  ToastService.info('Fila agregada. Completa los datos del integrante.');
+
+  try {
+    await MemberService.deleteMember(target.id);
+    ToastService.success(
+      `«${MemberService.getDisplayName(target)}» eliminado de la base de datos.`,
+    );
+    await load();
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
 }
 
-function onFormSubmit(dto: CreateMemberDTO): void {
-  const member = MemberService.createMember(dto);
-  isFormOpen.value = false;
-  page.value = totalPages.value;
-  ToastService.success(`Integrante «${MemberService.getDisplayName(member)}» agregado.`);
+async function onFormSubmit(dto: CreateMemberDTO): Promise<void> {
+  try {
+    const member = await MemberService.createMember(dto);
+    isFormOpen.value = false;
+    await load();
+    page.value = totalPages.value;
+    ToastService.success(`Integrante «${MemberService.getDisplayName(member)}» agregado.`);
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
 }
 
 async function exportToExcel(): Promise<void> {
@@ -154,7 +205,11 @@ async function exportToExcel(): Promise<void> {
   isExporting.value = true;
   try {
     const groupName = group.value?.name ?? 'Integrantes';
-    const blob = await ExcelExportService.buildMembersBlob(filteredMembers.value, groupName);
+    const blob = await ExcelExportService.buildMembersBlob(
+      filteredMembers.value,
+      groupName,
+      lookups.value,
+    );
     downloadBlob(blob, `${slugify(groupName) || 'integrantes'}-integrantes.xlsx`);
     ToastService.success(`Excel generado con ${filteredMembers.value.length} integrante(s).`);
   } catch {
@@ -178,6 +233,10 @@ function goBack(): void {
   }
   void router.push({ name: ROUTE_NAMES.BOARD_HOME });
 }
+
+onMounted(() => {
+  void load();
+});
 </script>
 
 <template>
@@ -191,8 +250,10 @@ function goBack(): void {
       Volver
     </button>
 
+    <p v-if="isLoading" class="text-sm text-slate-500">Cargando integrantes…</p>
+
     <div
-      v-if="group === null"
+      v-else-if="group === null"
       class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
     >
       <p class="text-sm text-slate-500">No se encontró el grupo estudiantil.</p>
@@ -209,11 +270,7 @@ function goBack(): void {
         <div class="flex flex-wrap gap-2">
           <AppButton variant="secondary" @click="isFormOpen = true">
             <i class="fa-solid fa-user-plus" />
-            Agregar con formulario
-          </AppButton>
-          <AppButton variant="secondary" @click="addRowInline">
-            <i class="fa-solid fa-plus" />
-            Agregar fila
+            Agregar integrante
           </AppButton>
           <AppButton :disabled="isExporting" @click="handleExportClick">
             <i class="fa-solid fa-file-excel" />

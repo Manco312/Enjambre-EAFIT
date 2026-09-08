@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* External Imports */
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
@@ -12,11 +12,10 @@ import type { Nullable } from '@/types/Nullable';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import { CommitteeService } from '@/services/CommitteeService';
 import { GroupService } from '@/services/GroupService';
-import { MemberService } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
-import { UserService } from '@/services/UserService';
+import { resolveErrorMessage } from '@/utils/resolveErrorMessage';
 
 /* Types */
 interface StatusWithTarget {
@@ -30,33 +29,46 @@ const route = useRoute();
 const router = useRouter();
 
 /* Reactive Variables */
+const isLoading = ref<boolean>(true);
 const isDeleteOpen = ref<boolean>(false);
+const group = ref<Nullable<GroupInterface>>(null);
+const committees = ref<CommitteeInterface[]>([]);
+const memberStatuses = ref<StatusWithTarget[]>([]);
+const memberCount = ref<number>(0);
 
 /* Selectors */
 const groupId = computed<number>(() => Number(route.params.id));
-const group = computed<Nullable<GroupInterface>>(() => GroupService.getGroupById(groupId.value));
-const committees = computed<CommitteeInterface[]>(() =>
-  CommitteeService.getCommitteesByGroupId(groupId.value),
-);
-const memberStatuses = computed<StatusWithTarget[]>(() =>
-  MemberStatusService.getMemberStatusesByGroupId(groupId.value).map(
-    (status: MemberStatusInterface) => ({
-      id: status.id,
-      name: status.name,
-      percentage: status.target,
-    }),
-  ),
-);
-const memberCount = computed<number>(() => MemberService.getMembersByGroupId(groupId.value).length);
-const boardUsername = computed<string>(
-  () => UserService.getBoardUserByGroupId(groupId.value)?.username ?? '',
-);
 const deleteMessage = computed<string>(
   () =>
-    `Se eliminará «${group.value?.name ?? ''}», sus ${committees.value.length} comité(s) y la cuenta de su junta directiva. Esta acción no se puede deshacer.`,
+    `Se eliminará «${group.value?.name ?? ''}», sus ${committees.value.length} comité(s), sus estados, actividades y la cuenta de su junta directiva. Esta acción no se puede deshacer.`,
 );
 
 /* Functions */
+async function load(): Promise<void> {
+  isLoading.value = true;
+  try {
+    const [foundGroup, foundCommittees, foundStatuses, count] = await Promise.all([
+      GroupService.getGroupById(groupId.value),
+      CommitteeService.getCommitteesByGroupId(groupId.value),
+      MemberStatusService.getMemberStatusesByGroupId(groupId.value),
+      GroupService.getMemberCount(groupId.value),
+    ]);
+
+    group.value = foundGroup;
+    committees.value = foundCommittees;
+    memberStatuses.value = foundStatuses.map((status: MemberStatusInterface) => ({
+      id: status.id,
+      name: status.name,
+      percentage: status.target,
+    }));
+    memberCount.value = count;
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 function goBack(): void {
   void router.push({ name: ROUTE_NAMES.ADMIN_GROUPS });
 }
@@ -65,13 +77,22 @@ function goToEdit(): void {
   void router.push({ name: ROUTE_NAMES.ADMIN_GROUP_EDIT, params: { id: String(groupId.value) } });
 }
 
-function handleDelete(): void {
+async function handleDelete(): Promise<void> {
   const groupName = group.value?.name ?? '';
-  GroupService.deleteGroup(groupId.value);
   isDeleteOpen.value = false;
-  ToastService.success(`Grupo «${groupName}» eliminado.`);
-  void router.push({ name: ROUTE_NAMES.ADMIN_GROUPS });
+
+  try {
+    await GroupService.deleteGroup(groupId.value);
+    ToastService.success(`Grupo «${groupName}» eliminado.`);
+    void router.push({ name: ROUTE_NAMES.ADMIN_GROUPS });
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
 }
+
+onMounted(() => {
+  void load();
+});
 </script>
 
 <template>
@@ -85,8 +106,10 @@ function handleDelete(): void {
       Volver a grupos
     </button>
 
+    <p v-if="isLoading" class="text-sm text-slate-500">Cargando grupo…</p>
+
     <div
-      v-if="group === null"
+      v-else-if="group === null"
       class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
     >
       <p class="text-sm text-slate-500">El grupo solicitado no existe.</p>
@@ -114,14 +137,7 @@ function handleDelete(): void {
           </div>
         </div>
 
-        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <h3 class="text-sm font-bold text-slate-500">Cuenta de la junta directiva</h3>
-            <p class="mt-2 flex items-center gap-2 text-sm text-ink">
-              <i class="fa-solid fa-user-shield text-slate-400" />
-              {{ boardUsername || 'sin cuenta asociada' }}
-            </p>
-          </div>
+        <div class="mt-6 grid gap-6 sm:grid-cols-2">
           <div>
             <h3 class="text-sm font-bold text-slate-500">Comités / Departamentos</h3>
             <ul class="mt-2 space-y-1.5">

@@ -4,6 +4,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  RelationId,
   Unique,
   CreateDateColumn,
   UpdateDateColumn,
@@ -27,12 +28,18 @@ export class Permanence {
   @JoinColumn({ referencedColumnName: 'id' })
   member: Member;
 
+  @RelationId((permanence: Permanence) => permanence.member)
+  memberId: number;
+
   @ManyToOne(() => Activity, (activity) => activity.permanences, {
     eager: true,
     onDelete: 'CASCADE',
   })
   @JoinColumn({ referencedColumnName: 'id' })
   activity: Activity;
+
+  @RelationId((permanence: Permanence) => permanence.activity)
+  activityId: number;
 
   @CreateDateColumn()
   createdAt: Date;

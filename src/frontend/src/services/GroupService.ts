@@ -1,21 +1,19 @@
+import axios from 'axios';
+
 import type { CreateGroupDTO } from '@/dtos/CreateGroupDTO';
 import type { GroupInterface } from '@/interfaces/GroupInterface';
+import type { GroupMemberInterface } from '@/interfaces/GroupMemberInterface';
 import type { MemberStatusDraft } from '@/types/MemberStatusDraft';
 import type { NameDraft } from '@/types/NameDraft';
 import type { Nullable } from '@/types/Nullable';
 import type { RegisterGroupDTO } from '@/dtos/RegisterGroupDTO';
 import type { UpdateGroupDTO } from '@/dtos/UpdateGroupDTO';
-import { ActivityService } from '@/services/ActivityService';
 import { CommitteeService } from '@/services/CommitteeService';
 import { DomainError } from '@/utils/DomainError';
-import { GroupMemberService } from '@/services/GroupMemberService';
-import { MemberService } from '@/services/MemberService';
+import { ENVIRONMENT } from '@/constants/environment';
 import { MemberStatusService } from '@/services/MemberStatusService';
-import { USER_ROLES } from '@/constants/roles';
 import { UserService } from '@/services/UserService';
 import { clampPercentage } from '@/utils/clampPercentage';
-import { generateId } from '@/utils/generateId';
-import { useGroupStore } from '@/stores/groupstore';
 
 export interface UpdateGroupDetailsDTO {
   name: string;
@@ -29,53 +27,82 @@ interface NamedEntity {
 }
 
 interface ReconcileHandlers {
-  create: (name: string) => void;
-  rename: (id: number, name: string) => void;
-  remove: (id: number) => void;
+  create: (name: string) => Promise<unknown>;
+  rename: (id: number, name: string) => Promise<unknown>;
+  remove: (id: number) => Promise<unknown>;
 }
 
+const GROUPS_URL = `${ENVIRONMENT.API_URL}/groups`;
+const GROUP_MEMBERS_URL = `${ENVIRONMENT.API_URL}/group-members`;
+
 export class GroupService {
-  public static getGroups(): GroupInterface[] {
-    return useGroupStore().groups;
+  public static async getGroups(): Promise<GroupInterface[]> {
+    const { data } = await axios.get<GroupInterface[]>(GROUPS_URL);
+    return data;
   }
 
-  public static getGroupById(id: number): Nullable<GroupInterface> {
-    return useGroupStore().groups.find((group: GroupInterface) => group.id === id) ?? null;
+  public static async getGroupById(id: number): Promise<Nullable<GroupInterface>> {
+    try {
+      const { data } = await axios.get<GroupInterface>(`${GROUPS_URL}/${id}`);
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
-  public static groupNameExists(name: string, exceptId: Nullable<number> = null): boolean {
+  public static async getMemberCount(groupId: number): Promise<number> {
+    const { data } = await axios.get<GroupMemberInterface[]>(GROUP_MEMBERS_URL, {
+      params: { groupId },
+    });
+    return data.length;
+  }
+
+  public static async groupNameExists(
+    name: string,
+    exceptId: Nullable<number> = null,
+  ): Promise<boolean> {
     const normalized = name.trim().toLowerCase();
-    return useGroupStore().groups.some(
+    const groups = await GroupService.getGroups();
+    return groups.some(
       (group: GroupInterface) => group.name.toLowerCase() === normalized && group.id !== exceptId,
     );
   }
 
-  public static createGroup(dto: CreateGroupDTO): GroupInterface {
-    const store = useGroupStore();
-    const group: GroupInterface = {
-      id: generateId(store.groups),
-      name: dto.name.trim(),
-    };
-    store.addGroup(group);
-    return group;
+  public static async createGroup(dto: CreateGroupDTO): Promise<GroupInterface> {
+    const { data } = await axios.post<GroupInterface>(GROUPS_URL, { name: dto.name.trim() });
+    return data;
   }
 
-  public static registerGroup(dto: RegisterGroupDTO): GroupInterface {
-    if (GroupService.groupNameExists(dto.name)) {
+  public static async registerGroup(dto: RegisterGroupDTO): Promise<GroupInterface> {
+    if (await GroupService.groupNameExists(dto.name)) {
       throw new DomainError('GROUP_NAME_TAKEN');
     }
 
-    if (UserService.usernameExists(dto.boardUsername)) {
-      throw new DomainError('USERNAME_TAKEN');
+    const group = await GroupService.createGroup({ name: dto.name });
+
+    try {
+      await UserService.createUser({
+        username: dto.boardUsername,
+        password: dto.boardPassword,
+        groupId: group.id,
+      });
+    } catch (error: unknown) {
+      // Rollback: el usuario no se creó, borramos el grupo recién hecho.
+      await GroupService.deleteGroup(group.id).catch(() => undefined);
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        throw new DomainError('USERNAME_TAKEN');
+      }
+      throw error;
     }
 
-    const group = GroupService.createGroup({ name: dto.name });
-
-    GroupService.applyCommittees(
+    await GroupService.applyCommittees(
       group.id,
       dto.committeeNames.map((name: string) => ({ id: null, name })),
     );
-    GroupService.applyStatuses(
+    await GroupService.applyStatuses(
       group.id,
       dto.statuses.map((status) => ({
         id: null,
@@ -84,70 +111,63 @@ export class GroupService {
       })),
     );
 
-    UserService.createUser({
-      username: dto.boardUsername,
-      password: dto.boardPassword,
-      role: USER_ROLES.BOARD,
-      groupId: group.id,
-    });
-
     return group;
   }
 
-  public static updateGroup(id: number, dto: UpdateGroupDTO): GroupInterface {
-    const current = GroupService.getGroupById(id);
-    if (current === null) {
-      throw new DomainError('GROUP_NOT_FOUND');
-    }
-
-    const nextName = (dto.name ?? current.name).trim();
-    if (GroupService.groupNameExists(nextName, id)) {
+  public static async updateGroup(id: number, dto: UpdateGroupDTO): Promise<GroupInterface> {
+    const nextName = dto.name?.trim();
+    if (nextName !== undefined && (await GroupService.groupNameExists(nextName, id))) {
       throw new DomainError('GROUP_NAME_TAKEN');
     }
 
-    const updated: GroupInterface = { ...current, ...dto, name: nextName };
-    useGroupStore().updateGroup(updated);
-    return updated;
-  }
-
-  public static updateGroupDetails(id: number, dto: UpdateGroupDetailsDTO): GroupInterface {
-    const updated = GroupService.updateGroup(id, { name: dto.name });
-    GroupService.applyCommittees(id, dto.committees);
-    GroupService.applyStatuses(id, dto.statuses);
-    return updated;
-  }
-
-  public static deleteGroup(id: number): void {
-    const current = GroupService.getGroupById(id);
-    if (current === null) {
-      throw new DomainError('GROUP_NOT_FOUND');
+    try {
+      const { data } = await axios.patch<GroupInterface>(
+        `${GROUPS_URL}/${id}`,
+        nextName === undefined ? {} : { name: nextName },
+      );
+      return data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new DomainError('GROUP_NOT_FOUND');
+      }
+      throw error;
     }
-
-    ActivityService.deleteActivitiesByGroupId(id);
-    MemberService.deleteMembersByGroupId(id);
-    MemberStatusService.deleteMemberStatusesByGroupId(id);
-    CommitteeService.deleteCommitteesByGroupId(id);
-    UserService.deleteBoardUserByGroupId(id);
-    useGroupStore().removeGroup(id);
   }
 
-  private static applyCommittees(groupId: number, drafts: NameDraft[]): void {
-    GroupService.reconcile(CommitteeService.getCommitteesByGroupId(groupId), drafts, {
-      create: (name: string) => {
-        CommitteeService.createCommittee({ name, groupId });
-      },
-      rename: (id: number, name: string) => {
-        CommitteeService.updateCommittee(id, { name });
-      },
-      remove: (id: number) => {
-        ActivityService.deleteActivitiesByCommitteeId(id);
-        MemberService.removeCommitteeFromMembers(id);
-        CommitteeService.deleteCommittee(id);
-      },
+  public static async updateGroupDetails(
+    id: number,
+    dto: UpdateGroupDetailsDTO,
+  ): Promise<GroupInterface> {
+    const updated = await GroupService.updateGroup(id, { name: dto.name });
+    await GroupService.applyCommittees(id, dto.committees);
+    await GroupService.applyStatuses(id, dto.statuses);
+    return updated;
+  }
+
+  // El backend borra en cascada comités, estados, actividades, permanencias, la
+  // cuenta de junta y los miembros exclusivos del grupo.
+  public static async deleteGroup(id: number): Promise<void> {
+    try {
+      await axios.delete(`${GROUPS_URL}/${id}`);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new DomainError('GROUP_NOT_FOUND');
+      }
+      throw error;
+    }
+  }
+
+  private static async applyCommittees(groupId: number, drafts: NameDraft[]): Promise<void> {
+    const existing = await CommitteeService.getCommitteesByGroupId(groupId);
+    await GroupService.reconcile(existing, drafts, {
+      create: (name: string) => CommitteeService.createCommittee({ name, groupId }),
+      rename: (id: number, name: string) => CommitteeService.updateCommittee(id, { name }),
+      // El backend cascadea actividades y la relación M:N comité-miembro.
+      remove: (id: number) => CommitteeService.deleteCommittee(id),
     });
   }
 
-  private static applyStatuses(groupId: number, drafts: MemberStatusDraft[]): void {
+  private static async applyStatuses(groupId: number, drafts: MemberStatusDraft[]): Promise<void> {
     const cleaned = drafts
       .map((draft: MemberStatusDraft) => ({
         id: draft.id,
@@ -160,45 +180,57 @@ export class GroupService {
       .map((draft) => draft.id)
       .filter((id: Nullable<number>): id is number => id !== null);
 
-    // Se crean primero los estados nuevos para garantizar un estado de respaldo
-    // al que reasignar los miembros de un estado eliminado.
+    // Se crean primero los estados nuevos para tener un estado de respaldo al
+    // que reasignar los miembros de un estado eliminado.
     const survivingIds = [...keptIds];
-    cleaned
-      .filter((draft) => draft.id === null)
-      .forEach((draft) => {
-        const status = MemberStatusService.createMemberStatus({
-          name: draft.name,
-          groupId,
-          target: draft.percentage,
-        });
-        survivingIds.push(status.id);
+    for (const draft of cleaned.filter((draft) => draft.id === null)) {
+      const status = await MemberStatusService.createMemberStatus({
+        name: draft.name,
+        groupId,
+        target: draft.percentage,
       });
+      survivingIds.push(status.id);
+    }
 
     const fallbackStatusId = survivingIds[0] ?? null;
-    MemberStatusService.getMemberStatusesByGroupId(groupId)
-      .filter((status) => !keptIds.includes(status.id))
-      .forEach((status) => {
-        if (fallbackStatusId !== null) {
-          GroupMemberService.reassignStatus(status.id, fallbackStatusId);
-        }
-        MemberStatusService.deleteMemberStatus(status.id);
-      });
+    const existing = await MemberStatusService.getMemberStatusesByGroupId(groupId);
+    for (const status of existing.filter((status) => !keptIds.includes(status.id))) {
+      if (fallbackStatusId !== null) {
+        await GroupService.reassignStatus(groupId, status.id, fallbackStatusId);
+      }
+      await MemberStatusService.deleteMemberStatus(status.id);
+    }
 
-    cleaned
-      .filter((draft): draft is typeof draft & { id: number } => draft.id !== null)
-      .forEach((draft) => {
-        MemberStatusService.updateMemberStatus(draft.id, {
-          name: draft.name,
-          target: draft.percentage,
-        });
+    for (const draft of cleaned.filter(
+      (draft): draft is typeof draft & { id: number } => draft.id !== null,
+    )) {
+      await MemberStatusService.updateMemberStatus(draft.id, {
+        name: draft.name,
+        target: draft.percentage,
       });
+    }
   }
 
-  private static reconcile(
+  // El backend no permite borrar un estado con miembros asignados (FK sin
+  // cascada), así que hay que moverlos a otro estado primero.
+  private static async reassignStatus(
+    groupId: number,
+    fromStatusId: number,
+    toStatusId: number,
+  ): Promise<void> {
+    const { data: links } = await axios.get<GroupMemberInterface[]>(GROUP_MEMBERS_URL, {
+      params: { groupId },
+    });
+    for (const link of links.filter((link) => link.memberStatusId === fromStatusId)) {
+      await axios.patch(`${GROUP_MEMBERS_URL}/${link.id}`, { memberStatusId: toStatusId });
+    }
+  }
+
+  private static async reconcile(
     existing: NamedEntity[],
     drafts: NameDraft[],
     handlers: ReconcileHandlers,
-  ): void {
+  ): Promise<void> {
     const cleaned = drafts
       .map((draft: NameDraft) => ({ id: draft.id, name: draft.name.trim() }))
       .filter((draft: NameDraft) => draft.name.length > 0);
@@ -207,18 +239,16 @@ export class GroupService {
       .map((draft: NameDraft) => draft.id)
       .filter((id: Nullable<number>): id is number => id !== null);
 
-    existing
-      .filter((entity: NamedEntity) => !keptIds.includes(entity.id))
-      .forEach((entity: NamedEntity) => {
-        handlers.remove(entity.id);
-      });
+    for (const entity of existing.filter((entity: NamedEntity) => !keptIds.includes(entity.id))) {
+      await handlers.remove(entity.id);
+    }
 
-    cleaned.forEach((draft: NameDraft) => {
+    for (const draft of cleaned) {
       if (draft.id === null) {
-        handlers.create(draft.name);
+        await handlers.create(draft.name);
       } else {
-        handlers.rename(draft.id, draft.name);
+        await handlers.rename(draft.id, draft.name);
       }
-    });
+    }
   }
 }

@@ -23,12 +23,14 @@ const errorMessage = ref<string>('');
 const isSubmitting = ref<boolean>(false);
 
 /* Functions */
-function handleSubmit(): void {
+async function handleSubmit(): Promise<void> {
   errorMessage.value = '';
   isSubmitting.value = true;
 
+  credentials.username = credentials.username.trim();
+
   try {
-    const session = AuthService.login(credentials);
+    const session = await AuthService.login(credentials);
     ToastService.success(`Sesión iniciada como ${session.username}.`);
     void router.push({ name: AuthService.resolveHomeRouteName() });
   } catch (error: unknown) {

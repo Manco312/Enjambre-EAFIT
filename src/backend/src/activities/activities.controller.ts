@@ -2,6 +2,7 @@ import {
   Controller,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   Get,
   Post,
@@ -17,6 +18,23 @@ import { UpdateActivityDto } from './dto/update-activity.dto.js';
 @Controller('activities')
 export class ActivitiesController {
   constructor(private readonly activitiesService: ActivitiesService) {}
+
+  @Get()
+  async findAll(
+    @Query('groupId', new ParseIntPipe({ optional: true })) groupId?: number,
+    @Query('committeeId', new ParseIntPipe({ optional: true }))
+    committeeId?: number,
+  ): Promise<Activity[]> {
+    if (groupId !== undefined) {
+      return await this.activitiesService.findByGroup(groupId);
+    }
+
+    if (committeeId !== undefined) {
+      return await this.activitiesService.findByCommittee(committeeId);
+    }
+
+    return await this.activitiesService.findAll();
+  }
 
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number): Promise<Activity> {

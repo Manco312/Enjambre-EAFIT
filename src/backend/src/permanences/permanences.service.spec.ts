@@ -22,6 +22,7 @@ describe('PermanencesService', () => {
         {
           provide: getRepositoryToken(Permanence),
           useValue: {
+            find: vi.fn(),
             findOneBy: vi.fn(),
             findOne: vi.fn(),
             create: vi.fn(),
@@ -52,6 +53,49 @@ describe('PermanencesService', () => {
 
     membersService = module.get<MembersService>(MembersService);
     activitiesService = module.get<ActivitiesService>(ActivitiesService);
+  });
+
+  describe('list helpers', () => {
+    const permanences = [{ id: 1, percentage: 80 }] as Permanence[];
+
+    it('findAll should return every permanence', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(permanences);
+
+      const result = await service.findAll();
+
+      expect(repository.find).toHaveBeenCalledWith();
+      expect(result).toBe(permanences);
+    });
+
+    it('findByMember should filter by member id', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(permanences);
+
+      await service.findByMember(5);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { member: { id: 5 } },
+      });
+    });
+
+    it('findByActivity should filter by activity id', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(permanences);
+
+      await service.findByActivity(8);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { activity: { id: 8 } },
+      });
+    });
+
+    it('findByGroup should filter by the activity group id', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue(permanences);
+
+      await service.findByGroup(2);
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: { activity: { group: { id: 2 } } },
+      });
+    });
   });
 
   describe('findById', () => {

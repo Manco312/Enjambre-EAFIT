@@ -26,6 +26,12 @@ export class MembersService {
     return await this.membersRepository.find();
   }
 
+  async findByGroup(groupId: number): Promise<Member[]> {
+    return await this.membersRepository.find({
+      where: { groupMembers: { group: { id: groupId } } },
+    });
+  }
+
   async findById(id: number): Promise<Member> {
     const member = await this.membersRepository.findOneBy({ id });
 

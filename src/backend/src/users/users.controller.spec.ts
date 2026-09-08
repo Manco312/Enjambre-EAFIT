@@ -34,12 +34,13 @@ describe('UsersController', () => {
       const dto = {
         username: 'john',
         password: 'password123',
+        groupId: 7,
       };
 
       const user = {
         id: 1,
         username: 'john',
-        role: 'board',
+        role: 'BOARD',
       } as User;
 
       vi.spyOn(service, 'create').mockResolvedValue(user);
@@ -54,6 +55,7 @@ describe('UsersController', () => {
       const dto = {
         username: 'john',
         password: 'password123',
+        groupId: 7,
       };
 
       vi.spyOn(service, 'create').mockRejectedValue(

@@ -52,7 +52,7 @@ describe('AuthService', () => {
         id: 1,
         username: 'john',
         password: 'hashedPassword',
-        role: 'board',
+        role: 'BOARD',
       } as User;
 
       vi.spyOn(usersService, 'findOne').mockResolvedValue(user);
@@ -71,11 +71,35 @@ describe('AuthService', () => {
       expect(jwtService.signAsync).toHaveBeenCalledWith({
         sub: 1,
         username: 'john',
-        role: 'board',
+        role: 'BOARD',
+        groupId: null,
       });
 
       expect(result).toEqual({
         access_token: 'jwt-token',
+      });
+    });
+
+    it('should include the groupId in the payload when the user belongs to a group', async () => {
+      const user = {
+        id: 2,
+        username: 'junta',
+        password: 'hashedPassword',
+        role: 'BOARD',
+        group: { id: 7 },
+      } as User;
+
+      vi.spyOn(usersService, 'findOne').mockResolvedValue(user);
+      vi.spyOn(jwtService, 'signAsync').mockResolvedValue('jwt-token');
+      vi.mocked(bcrypt.compare).mockImplementation(async () => true);
+
+      await service.signIn('junta', 'password123');
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: 2,
+        username: 'junta',
+        role: 'BOARD',
+        groupId: 7,
       });
     });
 
@@ -96,7 +120,7 @@ describe('AuthService', () => {
         id: 1,
         username: 'john',
         password: 'hashedPassword',
-        role: 'board',
+        role: 'BOARD',
       } as User;
 
       vi.spyOn(usersService, 'findOne').mockResolvedValue(user);

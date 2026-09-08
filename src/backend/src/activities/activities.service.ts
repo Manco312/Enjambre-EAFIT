@@ -18,6 +18,22 @@ export class ActivitiesService {
     private readonly committeesService: CommitteesService,
   ) {}
 
+  async findAll(): Promise<Activity[]> {
+    return await this.activitiesRepository.find();
+  }
+
+  async findByGroup(groupId: number): Promise<Activity[]> {
+    return await this.activitiesRepository.find({
+      where: { group: { id: groupId } },
+    });
+  }
+
+  async findByCommittee(committeeId: number): Promise<Activity[]> {
+    return await this.activitiesRepository.find({
+      where: { committee: { id: committeeId } },
+    });
+  }
+
   async findById(id: number): Promise<Activity> {
     const activity = await this.activitiesRepository.findOneBy({ id });
 

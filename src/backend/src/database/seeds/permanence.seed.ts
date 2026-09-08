@@ -44,7 +44,7 @@ export async function seedPermanences() {
   }
 
   const permanence = repository.create({
-    percentage: 100,
+    percentage: 10,
     member,
     activity,
   });

@@ -63,7 +63,9 @@ watch(
 );
 
 /* Functions */
-function handleSubmit(): void {
+const isSubmitting = ref<boolean>(false);
+
+async function handleSubmit(): Promise<void> {
   formError.value = '';
 
   const payload = {
@@ -82,13 +84,16 @@ function handleSubmit(): void {
     return;
   }
 
+  isSubmitting.value = true;
   try {
-    const group = GroupService.registerGroup(payload);
+    const group = await GroupService.registerGroup(payload);
     ToastService.success(`Grupo «${group.name}» creado correctamente.`);
     void router.push({ name: ROUTE_NAMES.ADMIN_GROUP_DETAIL, params: { id: String(group.id) } });
   } catch (error: unknown) {
     formError.value = resolveErrorMessage(error);
     ToastService.error(formError.value);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
@@ -175,7 +180,9 @@ function goBack(): void {
 
         <div class="flex justify-end gap-3">
           <AppButton variant="ghost" type="button" @click="goBack">Cancelar</AppButton>
-          <AppButton type="submit">Crear grupo</AppButton>
+          <AppButton type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Creando…' : 'Crear grupo' }}
+          </AppButton>
         </div>
       </form>
     </div>

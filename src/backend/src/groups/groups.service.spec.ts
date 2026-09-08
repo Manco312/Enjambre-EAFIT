@@ -4,12 +4,21 @@ import { Repository, DeleteResult } from 'typeorm';
 
 import { GroupsService } from './groups.service.js';
 import { Group } from './entities/group.entity.js';
+import { GroupMember } from './entities/group-member.entity.js';
+import { Member } from '../members/entities/member.entity.js';
 
 describe('GroupsService', () => {
   let service: GroupsService;
   let repository: Repository<Group>;
+  let transactionManager: {
+    find: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
+    transactionManager = { find: vi.fn(), count: vi.fn(), delete: vi.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GroupsService,
@@ -22,6 +31,12 @@ describe('GroupsService', () => {
             save: vi.fn(),
             preload: vi.fn(),
             delete: vi.fn(),
+            manager: {
+              transaction: vi.fn(
+                async (cb: (m: typeof transactionManager) => unknown) =>
+                  cb(transactionManager),
+              ),
+            },
           },
         },
       ],
@@ -143,14 +158,26 @@ describe('GroupsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete a group', async () => {
-      const deleteResult = { affected: 1, raw: {} } as DeleteResult;
+    it('should delete the group, its group_members and only the orphan members', async () => {
+      const deleteResult = { affected: 1, raw: [] } as DeleteResult;
 
-      vi.spyOn(repository, 'delete').mockResolvedValue(deleteResult);
+      transactionManager.find.mockResolvedValue([
+        { member: { id: 10 } }, // queda sin grupos -> se borra
+        { member: { id: 20 } }, // sigue en otro grupo -> se conserva
+      ]);
+      transactionManager.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1);
+      transactionManager.delete.mockResolvedValue(deleteResult);
 
       const result = await service.remove(1);
 
-      expect(repository.delete).toHaveBeenCalledWith(1);
+      expect(transactionManager.delete).toHaveBeenCalledWith(GroupMember, {
+        group: { id: 1 },
+      });
+      expect(transactionManager.delete).toHaveBeenCalledWith(Member, 10);
+      expect(transactionManager.delete).not.toHaveBeenCalledWith(Member, 20);
+      expect(transactionManager.delete).toHaveBeenLastCalledWith(Group, 1);
       expect(result).toBe(deleteResult);
     });
   });

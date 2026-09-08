@@ -19,6 +19,7 @@ describe('MembersController', () => {
           provide: MembersService,
           useValue: {
             findAll: vi.fn(),
+            findByGroup: vi.fn(),
             findById: vi.fn(),
             create: vi.fn(),
             update: vi.fn(),
@@ -37,14 +38,23 @@ describe('MembersController', () => {
   });
 
   describe('findAll', () => {
-    it('should return every member', async () => {
-      const members = [{ id: 1, fullName: 'Juan Pérez' }] as Member[];
+    const members = [{ id: 1, fullName: 'Juan Pérez' }] as Member[];
 
+    it('should return every member when no groupId is given', async () => {
       vi.spyOn(service, 'findAll').mockResolvedValue(members);
 
       const result = await controller.findAll();
 
       expect(service.findAll).toHaveBeenCalledWith();
+      expect(result).toBe(members);
+    });
+
+    it('should filter by groupId when provided', async () => {
+      vi.spyOn(service, 'findByGroup').mockResolvedValue(members);
+
+      const result = await controller.findAll(2);
+
+      expect(service.findByGroup).toHaveBeenCalledWith(2);
       expect(result).toBe(members);
     });
   });

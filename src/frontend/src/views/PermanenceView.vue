@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* External Imports */
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 /* Internal Imports */
@@ -25,6 +25,7 @@ import { PermanenceSheetService } from '@/services/PermanenceSheetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
 import { downloadBlob } from '@/utils/downloadBlob';
+import { resolveErrorMessage } from '@/utils/resolveErrorMessage';
 import { slugify } from '@/utils/slugify';
 
 /* Variables */
@@ -37,6 +38,11 @@ const isFormOpen = ref<boolean>(false);
 const editingActivity = ref<Nullable<ActivityInterface>>(null);
 const activityPendingDelete = ref<Nullable<ActivityInterface>>(null);
 const isExporting = ref<boolean>(false);
+const isLoading = ref<boolean>(true);
+
+const group = ref<Nullable<GroupInterface>>(null);
+const sheetOptions = ref<PermanenceSheetOption[]>([]);
+const sheet = ref<Nullable<PermanenceSheetView>>(null);
 
 /* Selectors */
 const isAdminRoute = computed<boolean>(() => route.name === ROUTE_NAMES.ADMIN_GROUP_PERMANENCE);
@@ -48,24 +54,10 @@ const groupId = computed<Nullable<number>>(() => {
   return AuthService.getSession()?.groupId ?? null;
 });
 
-const group = computed<Nullable<GroupInterface>>(() =>
-  groupId.value === null ? null : GroupService.getGroupById(groupId.value),
-);
-
-const sheetOptions = computed<PermanenceSheetOption[]>(() =>
-  groupId.value === null ? [] : PermanenceSheetService.getSheetOptions(groupId.value),
-);
-
 const activeSheetLabel = computed<string>(
   () =>
     sheetOptions.value.find((option: PermanenceSheetOption) => option.key === activeSheetKey.value)
       ?.label ?? 'General',
-);
-
-const sheet = computed<Nullable<PermanenceSheetView>>(() =>
-  groupId.value === null
-    ? null
-    : PermanenceSheetService.buildSheet(groupId.value, activeSheetKey.value),
 );
 
 const deleteMessage = computed<string>(() =>
@@ -84,7 +76,48 @@ watch(sheetOptions, (options: PermanenceSheetOption[]): void => {
   }
 });
 
+watch(activeSheetKey, () => {
+  void loadSheet();
+});
+
+watch(groupId, () => {
+  void load();
+});
+
 /* Functions */
+async function loadSheet(): Promise<void> {
+  if (groupId.value === null) {
+    return;
+  }
+  try {
+    sheet.value = await PermanenceSheetService.buildSheet(groupId.value, activeSheetKey.value);
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
+}
+
+async function load(): Promise<void> {
+  if (groupId.value === null) {
+    isLoading.value = false;
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    const [foundGroup, options] = await Promise.all([
+      GroupService.getGroupById(groupId.value),
+      PermanenceSheetService.getSheetOptions(groupId.value),
+    ]);
+    group.value = foundGroup;
+    sheetOptions.value = options;
+    await loadSheet();
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 function selectSheet(key: PermanenceSheetKey): void {
   activeSheetKey.value = key;
 }
@@ -95,51 +128,72 @@ function openCreate(): void {
 }
 
 function openEdit(activityId: number): void {
-  editingActivity.value = ActivityService.getActivityById(activityId);
+  editingActivity.value =
+    sheet.value?.activityColumns.find((activity) => activity.id === activityId) ?? null;
   isFormOpen.value = true;
 }
 
-function onFormSubmit(payload: ActivityFormPayload): void {
+async function onFormSubmit(payload: ActivityFormPayload): Promise<void> {
   if (groupId.value === null) {
     return;
   }
 
-  if (editingActivity.value !== null) {
-    ActivityService.updateActivity(editingActivity.value.id, payload);
-    ToastService.success('Actividad actualizada.');
-  } else {
-    const key = activeSheetKey.value;
-    ActivityService.createActivity({
-      groupId: groupId.value,
-      committeeId: key === 'general' ? null : key,
-      name: payload.name,
-      description: payload.description,
-      weight: payload.weight,
-      period: payload.period,
-    });
-    ToastService.success(`Actividad «${payload.name}» agregada.`);
-  }
+  try {
+    if (editingActivity.value !== null) {
+      await ActivityService.updateActivity(editingActivity.value.id, payload);
+      ToastService.success('Actividad actualizada.');
+    } else {
+      const key = activeSheetKey.value;
+      await ActivityService.createActivity({
+        groupId: groupId.value,
+        committeeId: key === 'general' ? null : key,
+        name: payload.name,
+        description: payload.description,
+        weight: payload.weight,
+      });
+      ToastService.success(`Actividad «${payload.name}» agregada.`);
+    }
 
-  isFormOpen.value = false;
-  editingActivity.value = null;
+    isFormOpen.value = false;
+    editingActivity.value = null;
+    await loadSheet();
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
 }
 
 function requestDeleteActivity(activityId: number): void {
-  activityPendingDelete.value = ActivityService.getActivityById(activityId);
+  activityPendingDelete.value =
+    sheet.value?.activityColumns.find((activity) => activity.id === activityId) ?? null;
 }
 
-function confirmDeleteActivity(): void {
-  if (activityPendingDelete.value !== null) {
-    const name = activityPendingDelete.value.name;
-    ActivityService.deleteActivity(activityPendingDelete.value.id);
-    ToastService.success(`Actividad «${name}» eliminada.`);
-  }
+async function confirmDeleteActivity(): Promise<void> {
+  const target = activityPendingDelete.value;
   activityPendingDelete.value = null;
+  if (target === null) {
+    return;
+  }
+
+  try {
+    await ActivityService.deleteActivity(target.id);
+    ToastService.success(`Actividad «${target.name}» eliminada.`);
+    await loadSheet();
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error));
+  }
 }
 
-function onSetValue(activityId: number, memberId: number, value: number): void {
-  PermanenceSheetService.setValue(activityId, memberId, value);
-  ToastService.success('Cambios guardados.', 'permanence-save');
+async function onSetValue(activityId: number, memberId: number, value: number): Promise<void> {
+  const maxValue =
+    sheet.value?.activityColumns.find((activity) => activity.id === activityId)?.weight ?? 100;
+  try {
+    await PermanenceSheetService.setValue(activityId, memberId, value, maxValue);
+    ToastService.success('Cambios guardados.', 'permanence-save');
+    await loadSheet();
+  } catch (error: unknown) {
+    ToastService.error(resolveErrorMessage(error), 'permanence-save');
+    await loadSheet();
+  }
 }
 
 async function exportToExcel(): Promise<void> {
@@ -173,6 +227,10 @@ function goBack(): void {
   }
   void router.push({ name: ROUTE_NAMES.BOARD_HOME });
 }
+
+onMounted(() => {
+  void load();
+});
 </script>
 
 <template>
@@ -186,8 +244,10 @@ function goBack(): void {
       Volver
     </button>
 
+    <p v-if="isLoading" class="text-sm text-slate-500">Cargando tabla de permanencia…</p>
+
     <div
-      v-if="group === null"
+      v-else-if="group === null"
       class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"
     >
       <p class="text-sm text-slate-500">No se encontró el grupo estudiantil.</p>
@@ -230,7 +290,7 @@ function goBack(): void {
 
       <p class="text-xs text-slate-400">
         En cada celda escribe los puntos obtenidos en esa actividad (máximo = su peso). El
-        <strong>puntaje</strong> es la suma de puntos sobre el total de pesos de la hoja. Verde =
+        <strong>puntaje</strong> es la suma de los puntos obtenidos en la hoja. Verde =
         cumple el objetivo de su estado de miembro; rojo = no lo cumple.
       </p>
 

@@ -2,6 +2,7 @@ import {
   Controller,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   Get,
   Post,
@@ -20,8 +21,12 @@ export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   @Get()
-  async findAll(): Promise<Member[]> {
-    return await this.membersService.findAll();
+  async findAll(
+    @Query('groupId', new ParseIntPipe({ optional: true })) groupId?: number,
+  ): Promise<Member[]> {
+    return groupId === undefined
+      ? await this.membersService.findAll()
+      : await this.membersService.findByGroup(groupId);
   }
 
   @Get(':id')

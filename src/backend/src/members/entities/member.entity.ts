@@ -5,6 +5,7 @@ import {
   ManyToMany,
   JoinTable,
   PrimaryGeneratedColumn,
+  RelationId,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -74,6 +75,9 @@ export class Member {
   })
   @JoinTable({ name: 'committee_member' })
   committees: Committee[];
+
+  @RelationId((member: Member) => member.committees)
+  committeeIds: number[];
 
   @OneToMany('Permanence', 'member')
   permanences: Permanence[];
