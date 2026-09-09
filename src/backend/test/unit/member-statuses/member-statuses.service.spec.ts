@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { MemberStatusesService } from './member-statuses.service.js';
-import { MemberStatus } from './entities/member-status.entity.js';
-import { GroupsService } from './groups.service.js';
-import { Group } from './entities/group.entity.js';
+import { MemberStatusesService } from '../../../src/groups/member-statuses.service.js';
+import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js';
+import { GroupsService } from '../../../src/groups/groups.service.js';
+import { Group } from '../../../src/groups/entities/group.entity.js';
 
 describe('MemberStatusesService', () => {
   let service: MemberStatusesService;

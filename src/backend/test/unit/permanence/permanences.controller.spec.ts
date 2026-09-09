@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { PermanencesController } from './permanences.controller.js';
-import { PermanencesService } from './permanences.service.js';
-import { Permanence } from './entities/permanence.entity.js';
-import { CreatePermanenceDto } from './dto/create-permanence.dto.js';
-import { UpdatePermanenceDto } from './dto/update-permanence.dto.js';
+import { PermanencesController } from '../../../src/permanences/permanences.controller.js'; 
+import { PermanencesService } from '../../../src/permanences/permanences.service.js'; 
+import { Permanence } from '../../../src/permanences/entities/permanence.entity.js'; 
+import { CreatePermanenceDto } from '../../../src/permanences/dto/create-permanence.dto.js'; 
+import { UpdatePermanenceDto } from '../../../src/permanences/dto/update-permanence.dto.js'; 
 
 describe('PermanencesController', () => {
   let controller: PermanencesController;

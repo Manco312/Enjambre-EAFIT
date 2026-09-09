@@ -6,8 +6,6 @@ import {
   IsString,
 } from 'class-validator';
 
-// Espeja el UpdateMemberDTO del frontend: solo campos propios del miembro.
-// El grupo y el estado se reasignan a través del recurso group-members.
 export class UpdateMemberDto {
   @IsOptional()
   @IsInt()

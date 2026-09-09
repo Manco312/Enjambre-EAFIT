@@ -4,11 +4,11 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
-import { AuthGuard } from './auth.guard.js';
-import { RolesGuard } from './roles.guard.js';
-import { Roles } from './decorators/roles.decorator.js';
-import { Public } from './decorators/public.decorator.js';
-import { USER_ROLES } from './roles.js';
+import { AuthGuard } from '../../src/auth/auth.guard.js'; 
+import { RolesGuard } from '../../src/auth/roles.guard.js'; 
+import { Roles } from '../../src/auth/decorators/roles.decorator.js'; 
+import { Public } from '../../src/auth/decorators/public.decorator.js'; 
+import { USER_ROLES } from '../../src/auth/roles.js'; 
 
 const SECRET = 'integration-secret';
 

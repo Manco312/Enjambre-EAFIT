@@ -2,11 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { MembersService } from './members.service.js';
-import { Member } from './entities/member.entity.js';
-import { CommitteesService } from '../committees/committees.service.js';
-import { GroupMembersService } from '../groups/group-members.service.js';
-import { Committee } from '../committees/entities/committee.entity.js';
+import { MembersService } from '../../../src/members/members.service.js'; 
+import { Member } from '../../../src/members/entities/member.entity.js'; 
+import { CommitteesService } from '../../../src/committees/committees.service.js'; 
+import { GroupMembersService } from '../../../src/groups/group-members.service.js'; 
+import { Committee } from '../../../src/committees/entities/committee.entity.js'; 
 
 describe('MembersService', () => {
   let service: MembersService;

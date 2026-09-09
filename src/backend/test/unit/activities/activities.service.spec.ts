@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { ActivitiesService } from './activities.service.js';
-import { GroupsService } from '../groups/groups.service.js';
-import { CommitteesService } from '../committees/committees.service.js';
-import { Activity } from './entities/activity.entity.js';
-import { Group } from '../groups/entities/group.entity.js';
-import { Committee } from '../committees/entities/committee.entity.js';
-import { getCurrentPeriod } from '../utils/period.util.js';
+import { ActivitiesService } from '../../../src/activities/activities.service.js';
+import { GroupsService } from '../../../src/groups/groups.service.js'; 
+import { CommitteesService } from '../../../src/committees/committees.service.js';
+import { Activity } from '../../../src/activities/entities/activity.entity.js'; 
+import { Group } from '../../../src/groups/entities/group.entity.js'; 
+import { Committee } from '../../../src/committees/entities/committee.entity.js'; 
+import { getCurrentPeriod } from '../../../src/utils/period.util.js'; 
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;

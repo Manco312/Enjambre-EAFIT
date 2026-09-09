@@ -2,12 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { PermanencesService } from './permanences.service.js';
-import { Permanence } from './entities/permanence.entity.js';
-import { MembersService } from '../members/members.service.js';
-import { ActivitiesService } from '../activities/activities.service.js';
-import { Member } from '../members/entities/member.entity.js';
-import { Activity } from '../activities/entities/activity.entity.js';
+import { PermanencesService } from '../../../src/permanences/permanences.service.js'; 
+import { Permanence } from '../../../src/permanences/entities/permanence.entity.js'; 
+import { MembersService } from '../../../src/members/members.service.js'; 
+import { ActivitiesService } from '../../../src/activities/activities.service.js'; 
+import { Member } from '../../../src/members/entities/member.entity.js';
+import { Activity } from '../../../src/activities/entities/activity.entity.js'; 
 
 describe('PermanencesService', () => {
   let service: PermanencesService;
@@ -172,7 +172,7 @@ describe('PermanencesService', () => {
       const member = {
         id: 1,
         name: 'Member 1',
-      } as Member;
+      } as unknown as Member;
 
       const activity = {
         id: 2,
@@ -282,7 +282,7 @@ describe('PermanencesService', () => {
       const member = {
         id: 2,
         name: 'Member 2',
-      } as Member;
+      } as unknown as Member;
 
       vi.spyOn(repository, 'preload').mockResolvedValue(permanence);
       vi.spyOn(membersService, 'findById').mockResolvedValue(member);
@@ -342,7 +342,7 @@ describe('PermanencesService', () => {
       const member = {
         id: 2,
         name: 'Member 2',
-      } as Member;
+      } as unknown as Member;
 
       const activity = {
         id: 3,
