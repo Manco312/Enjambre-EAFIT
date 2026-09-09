@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { ActivitiesController } from './activities.controller.js';
-import { ActivitiesService } from './activities.service.js';
-import { Activity } from './entities/activity.entity.js';
+import { ActivitiesController } from '../../../src/activities/activities.controller.js'; 
+import { ActivitiesService } from '../../../src/activities/activities.service.js'; 
+import { Activity } from '../../../src/activities/entities/activity.entity.js'; 
 
 describe('ActivitiesController', () => {
   let controller: ActivitiesController;

@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { MembersController } from './members.controller.js';
-import { MembersService } from './members.service.js';
-import { Member } from './entities/member.entity.js';
-import { CreateMemberDto } from './dto/create-member.dto.js';
-import { UpdateMemberDto } from './dto/update-member.dto.js';
+import { MembersController } from '../../../src/members/members.controller.js'; 
+import { MembersService } from '../../../src/members/members.service.js'; 
+import { Member } from '../../../src/members/entities/member.entity.js'; 
+import { CreateMemberDto } from '../../../src/members/dto/create-member.dto.js';
+import { UpdateMemberDto } from '../../../src/members/dto/update-member.dto.js'; 
 
 describe('MembersController', () => {
   let controller: MembersController;

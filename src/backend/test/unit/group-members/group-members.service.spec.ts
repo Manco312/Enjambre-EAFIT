@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { GroupMembersService } from './group-members.service.js';
-import { GroupMember } from './entities/group-member.entity.js';
-import { MemberStatus } from './entities/member-status.entity.js';
-import { Group } from './entities/group.entity.js';
-import { GroupsService } from './groups.service.js';
-import { MemberStatusesService } from './member-statuses.service.js';
-import { Member } from '../members/entities/member.entity.js';
+import { GroupMembersService } from '../../../src/groups/group-members.service.js'; 
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js'; 
+import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js'; 
+import { Group } from '../../../src/groups/entities/group.entity.js'; 
+import { GroupsService } from '../../../src/groups/groups.service.js'; 
+import { MemberStatusesService } from '../../../src/groups/member-statuses.service.js';
+import { Member } from '../../../src/members/entities/member.entity.js'; 
 
 describe('GroupMembersService', () => {
   let service: GroupMembersService;

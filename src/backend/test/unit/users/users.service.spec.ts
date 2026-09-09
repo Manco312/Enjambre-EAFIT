@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 
-import { UsersService } from './users.service.js';
-import { User } from './entities/user.entity.js';
-import { Group } from '../groups/entities/group.entity.js';
+import { UsersService } from '../../../src/users/users.service.js'; 
+import { User } from '../../../src/users/entities/user.entity.js'; 
+import { Group } from '../../../src/groups/entities/group.entity.js'; 
 
 vi.mock('bcrypt', () => ({
   default: {

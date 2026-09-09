@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 
-import { AuthController } from './auth.controller.js';
-import { AuthService } from './auth.service.js';
-import { UsersService } from '../users/users.service.js';
-import { User } from '../users/entities/user.entity.js';
+import { AuthController } from '../../../src/auth/auth.controller.js'; 
+import { AuthService } from '../../../src/auth/auth.service.js'; 
+import { UsersService } from '../../../src/users/users.service.js'; 
+import { User } from '../../../src/users/entities/user.entity.js'; 
 
 describe('AuthController', () => {
   let controller: AuthController;

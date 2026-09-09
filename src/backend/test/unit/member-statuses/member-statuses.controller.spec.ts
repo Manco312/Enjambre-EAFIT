@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { MemberStatusesController } from './member-statuses.controller.js';
-import { MemberStatusesService } from './member-statuses.service.js';
-import { MemberStatus } from './entities/member-status.entity.js';
-import { CreateMemberStatusDto } from './dto/create-member-status.dto.js';
-import { UpdateMemberStatusDto } from './dto/update-member-status.dto.js';
+import { MemberStatusesController } from '../../../src/groups/member-statuses.controller.js'; 
+import { MemberStatusesService } from '../../../src/groups/member-statuses.service.js'; 
+import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js'; 
+import { CreateMemberStatusDto } from '../../../src/groups/dto/create-member-status.dto.js'; 
+import { UpdateMemberStatusDto } from '../../../src/groups/dto/update-member-status.dto.js'; 
 
 describe('MemberStatusesController', () => {
   let controller: MemberStatusesController;

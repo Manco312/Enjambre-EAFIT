@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { CommitteesController } from './committees.controller.js';
-import { CommitteesService } from './committees.service.js';
-import { Committee } from './entities/committee.entity.js';
-import { CreateCommitteeDto } from './dto/create-committee.dto.js';
-import { UpdateCommitteeDto } from './dto/update-committee.dto.js';
+import { CommitteesController } from '../../../src/committees/committees.controller.js';
+import { CommitteesService } from '../../../src/committees/committees.service.js';
+import { Committee } from '../../../src/committees/entities/committee.entity.js';
+import { CreateCommitteeDto } from '../../../src/committees/dto/create-committee.dto.js';
+import { UpdateCommitteeDto } from '../../../src/committees/dto/update-committee.dto.js';
 
 describe('CommitteesController', () => {
   let controller: CommitteesController;

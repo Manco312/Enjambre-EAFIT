@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { GroupsService } from './groups.service.js';
-import { Group } from './entities/group.entity.js';
-import { GroupMember } from './entities/group-member.entity.js';
-import { Member } from '../members/entities/member.entity.js';
+import { GroupsService } from '../../../src/groups/groups.service.js'; 
+import { Group } from '../../../src/groups/entities/group.entity.js'; 
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js'; 
+import { Member } from '../../../src/members/entities/member.entity.js';
 
 describe('GroupsService', () => {
   let service: GroupsService;

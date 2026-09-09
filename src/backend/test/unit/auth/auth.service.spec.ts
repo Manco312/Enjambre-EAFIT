@@ -3,9 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
 import { UnauthorizedException } from '@nestjs/common';
 
-import { AuthService } from './auth.service.js';
-import { UsersService } from '../users/users.service.js';
-import { User } from '../users/entities/user.entity.js';
+import { AuthService } from '../../../src/auth/auth.service.js'; 
+import { UsersService } from '../../../src/users/users.service.js'; 
+import { User } from '../../../src/users/entities/user.entity.js'; 
 
 vi.mock('bcrypt', () => ({
   default: {

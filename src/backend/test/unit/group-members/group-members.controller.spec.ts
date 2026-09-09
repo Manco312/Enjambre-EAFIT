@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { GroupMembersController } from './group-members.controller.js';
-import { GroupMembersService } from './group-members.service.js';
-import { GroupMember } from './entities/group-member.entity.js';
-import { CreateGroupMemberDto } from './dto/create-group-member.dto.js';
-import { UpdateGroupMemberDto } from './dto/update-group-member.dto.js';
+import { GroupMembersController } from '../../../src/groups/group-members.controller.js';
+import { GroupMembersService } from '../../../src/groups/group-members.service.js'; 
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js'; 
+import { CreateGroupMemberDto } from '../../../src/groups/dto/create-group-member.dto.js'; 
+import { UpdateGroupMemberDto } from '../../../src/groups/dto/update-group-member.dto.js'; 
 
 describe('GroupMembersController', () => {
   let controller: GroupMembersController;
