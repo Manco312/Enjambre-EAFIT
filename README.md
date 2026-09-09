@@ -148,8 +148,7 @@ La documentación de las APIs se realizó mediante OpenAPI y Swagger UI. Para ac
 
 
 `http://localhost:3000/docs`
---
--
+---
 
 ## 4. Frontend en detalle (`src/frontend`)
 
