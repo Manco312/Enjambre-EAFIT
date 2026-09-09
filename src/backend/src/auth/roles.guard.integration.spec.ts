@@ -51,8 +51,16 @@ describe('AuthGuard + RolesGuard (integration)', () => {
     await app.init();
 
     const jwt = app.get(JwtService);
-    adminToken = jwt.sign({ sub: 1, username: 'admin', role: USER_ROLES.ADMIN });
-    boardToken = jwt.sign({ sub: 2, username: 'junta', role: USER_ROLES.BOARD });
+    adminToken = jwt.sign({
+      sub: 1,
+      username: 'admin',
+      role: USER_ROLES.ADMIN,
+    });
+    boardToken = jwt.sign({
+      sub: 2,
+      username: 'junta',
+      role: USER_ROLES.BOARD,
+    });
   });
 
   afterAll(async () => {
@@ -64,7 +72,8 @@ describe('AuthGuard + RolesGuard (integration)', () => {
     return token ? req.set('Authorization', `Bearer ${token}`) : req;
   };
 
-  it('lets a public route through without a token', () => get('/open').expect(200));
+  it('lets a public route through without a token', () =>
+    get('/open').expect(200));
 
   it('blocks a non-public route without a token (AuthGuard runs first)', () =>
     get('/any-auth').expect(401));
