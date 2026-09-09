@@ -143,7 +143,13 @@ propiedades no declaradas** (`forbidNonWhitelisted`).
 | `npm run lint`       | oxlint.                                             |
 | `npm run format`     | Prettier `--write`.                                 |
 
----
+### 3.6 Documentación de las APIs
+La documentación de las APIs se realizó mediante OpenAPI y Swagger UI. Para acceder a la documentación, es necesario ejecutar previamente el backend y dirigirse a la siguiente ruta:
+
+
+`http://localhost:3000/docs`
+--
+-
 
 ## 4. Frontend en detalle (`src/frontend`)
 

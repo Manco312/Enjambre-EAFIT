@@ -35,8 +35,8 @@ async function bootstrap() {
 
   // Documentación APIs
   const config = new DocumentBuilder()
-    .setTitle('Mi API')
-    .setDescription('Documentación de mi API')
+    .setTitle('Enjambre EAFIT')
+    .setDescription('Documentación de APIs de Enjambre EAFIT')
     .setVersion('1.0')
     .build();
 
