@@ -108,7 +108,9 @@ describe('AuthController', () => {
 
       vi.spyOn(usersService, 'findOne').mockResolvedValue(null);
 
-      await expect(controller.me(request)).rejects.toThrow(UnauthorizedException);
+      await expect(controller.me(request)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

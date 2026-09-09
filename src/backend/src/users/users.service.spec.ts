@@ -125,7 +125,9 @@ describe('UsersService', () => {
       vi.spyOn(usersRepository, 'findOne')
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 99 } as User);
-      vi.spyOn(groupsRepository, 'findOneBy').mockResolvedValue({ id: 7 } as Group);
+      vi.spyOn(groupsRepository, 'findOneBy').mockResolvedValue({
+        id: 7,
+      } as Group);
 
       await expect(service.create(dto)).rejects.toThrow(ConflictException);
       expect(usersRepository.save).not.toHaveBeenCalled();

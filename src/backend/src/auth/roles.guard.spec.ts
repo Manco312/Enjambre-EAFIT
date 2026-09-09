@@ -30,7 +30,9 @@ describe('RolesGuard', () => {
   });
 
   it('allows the request when the user has one of the required roles', () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([USER_ROLES.ADMIN]);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      USER_ROLES.ADMIN,
+    ]);
 
     expect(guard.canActivate(contextWithUser({ role: USER_ROLES.ADMIN }))).toBe(
       true,
@@ -38,7 +40,9 @@ describe('RolesGuard', () => {
   });
 
   it('rejects the request when the user role is not allowed', () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([USER_ROLES.ADMIN]);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      USER_ROLES.ADMIN,
+    ]);
 
     expect(() =>
       guard.canActivate(contextWithUser({ role: USER_ROLES.BOARD })),
@@ -46,7 +50,9 @@ describe('RolesGuard', () => {
   });
 
   it('rejects the request when there is no authenticated user', () => {
-    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([USER_ROLES.ADMIN]);
+    vi.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
+      USER_ROLES.ADMIN,
+    ]);
 
     expect(() => guard.canActivate(contextWithUser(undefined))).toThrow(
       ForbiddenException,

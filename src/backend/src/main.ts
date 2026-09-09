@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   if (!process.env.JWT_SECRET) {
@@ -31,6 +32,17 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Documentación APIs
+  const config = new DocumentBuilder()
+    .setTitle('Enjambre EAFIT')
+    .setDescription('Documentación de APIs de Enjambre EAFIT')
+    .setVersion('1.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('docs', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
 }

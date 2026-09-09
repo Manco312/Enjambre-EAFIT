@@ -316,28 +316,28 @@ describe('getCurrentPeriod', () => {
   describe('boundary dates', () => {
     it('should return period 1 on June 30', () => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-06-30'));
+      vi.setSystemTime(new Date(2026, 5, 30));
 
       expect(getCurrentPeriod()).toBe('2026-1');
     });
 
     it('should return period 2 on July 1', () => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-07-01'));
+      vi.setSystemTime(new Date(2026, 6, 1));
 
       expect(getCurrentPeriod()).toBe('2026-2');
     });
 
     it('should return period 2 on December 31', () => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-12-31'));
+      vi.setSystemTime(new Date(2026, 11, 31));
 
       expect(getCurrentPeriod()).toBe('2026-2');
     });
 
     it('should return period 1 on January 1', () => {
       vi.useFakeTimers();
-      vi.setSystemTime(new Date('2027-01-01'));
+      vi.setSystemTime(new Date(2027, 0, 1));
 
       expect(getCurrentPeriod()).toBe('2027-1');
     });
