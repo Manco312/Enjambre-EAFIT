@@ -32,7 +32,7 @@ function handleLogout(): void {
   <div class="min-h-screen bg-slate-50 text-ink">
     <div v-if="showAppChrome" class="flex min-h-screen">
       <AppSidebar />
-      <div class="flex min-h-screen flex-1 flex-col lg:pl-64">
+      <div class="flex min-h-scree min-w-0 flex-1 flex-col lg:pl-64">
         <AppTopbar @logout="handleLogout" />
         <main class="flex-1 p-6">
           <RouterView />
