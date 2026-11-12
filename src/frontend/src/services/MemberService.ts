@@ -78,8 +78,10 @@ export class MemberService {
     await GroupMemberService.updateStatus(memberId, groupId, memberStatusId);
   }
 
-  public static async deleteMember(id: number): Promise<void> {
-    await axios.delete(`${MEMBERS_URL}/${id}`);
+  // Saca al integrante del grupo. La API lo borra del todo solo si no
+  // pertenece a ningún otro grupo.
+  public static async deleteMember(id: number, groupId: number): Promise<void> {
+    await axios.delete(`${MEMBERS_URL}/${id}`, { params: { groupId } });
   }
 
   public static getDisplayName(member: MemberInterface): string {

@@ -2,7 +2,7 @@
 
 > Documento de contexto para que los prompts futuros sean cortos. Si algo aquí
 > contradice al código, **gana el código** — y actualiza este archivo.
-> Última revisión: 2026-09-08.
+> Última revisión: 2026-11-10.
 
 ---
 
@@ -135,6 +135,10 @@ Permanence *─1 Member, *─1 Activity   UNIQUE(member, activity); percentage:i
 
 Detalles que importan:
 
+- **Un mismo `Member` puede estar en varios grupos.** Al dar de alta a alguien
+  cuyo `idEpik` **y** `documentNumber` ya existen, `MembersService.create` lo
+  vincula al grupo (nuevo `GroupMember`) en vez de duplicarlo; si solo coincide
+  parte de los campos únicos responde 409 diciendo cuáles.
 - **`Member`** trae solo columnas del ER: `idEpik` (unique), `fullName`,
   `documentType`, `documentNumber` (unique), `email` (unique, se guarda TRIM+UPPER),
   `phone` (unique), `program`, `secondProgram?`. La pertenencia a comités es M:N por
@@ -144,13 +148,25 @@ Detalles que importan:
   `MemberWithMembership` (= `MemberInterface` + `memberStatusId`) resolviendo el join.
 - **`MemberStatus.target`**: objetivo de permanencia embebido (no hay entidad
   `PermanenceTarget` aparte).
-- **`Activity`**: `weight` (int, %), `period` (`"YYYY-S"`, **lo asigna el servidor**,
-  no se manda desde el front), `committeeId` nullable. General ⇔ `committeeId === null`.
+- **`Activity`**: `weight` (int, **1–100**), `period` (`"YYYY-S"`, **lo asigna el
+  servidor**, no se manda desde el front), `committeeId` nullable, `description`
+  opcional (se guarda `''`). General ⇔ `committeeId === null`. Una **hoja** = las
+  actividades generales de un grupo o las de un comité; **los pesos de una hoja no
+  pueden sumar más de 100** y el comité debe ser del mismo grupo.
 - **`Permanence.percentage`**: **puntos obtenidos** en esa actividad, entero en
-  `[0, weight]`. **No es un 0–100.** Se llama `percentage` por la columna del backend.
+  `[0, weight]` (lo valida `PermanencesService`). **No es un 0–100.** Se llama
+  `percentage` por la columna del backend. El integrante debe pertenecer al grupo
+  (y al comité, si aplica) de la actividad. **Sin registro ≠ 0**: una celda sin
+  calificar no tiene fila en `permanence`.
 - **Eager loading** en casi todas las relaciones + `onDelete: 'CASCADE'`. Borrar un
   `Group` cascadea a comités, estados, actividades, permanencias, cuenta de junta y
-  miembros que no estén en otro grupo.
+  miembros que no estén en otro grupo. Borrar un `Committee` cascadea también sus
+  filas de `committee_member` (`onDelete` en el lado inverso del M:N). La única FK
+  sin cascada es `GroupMember.memberStatus`: borrar un estado con integrantes
+  responde 409.
+- **Limpieza de puntajes**: al sacar a un integrante de un comité
+  (`PATCH /members/:id` con `committeeIds`) o de un grupo se borran sus
+  `Permanence` de ese comité / grupo, para que no reaparezcan si vuelve a entrar.
 - `password` en `User` lleva `@Exclude()` (no se serializa; `UsersController` activa
   `ClassSerializerInterceptor`).
 
@@ -175,6 +191,14 @@ solo `POST /api/auth/login` es `@Public()`.
 
 - `ValidationPipe` global con `forbidNonWhitelisted` → mandar una propiedad no
   declarada en el DTO devuelve **400**.
+- **Mensajes de error**: los 400 (validación) y 409 (choque con datos existentes)
+  llevan un `message` **en español pensado para el usuario**; el front lo muestra tal
+  cual (`utils/resolveErrorMessage.ts`). Los 404/500 siguen siendo técnicos y el
+  front muestra un mensaje genérico. Al agregar una regla, redacta su mensaje así.
+- `DELETE /members/:id?groupId=` saca al integrante **solo de ese grupo** (y lo
+  borra del todo si era su único grupo). Sin `groupId` lo borra de todos.
+- `PATCH /members/:id` acepta `groupId` junto a `committeeIds`: solo se
+  reemplazan los comités de ese grupo (el front siempre lo envía).
 - No hay endpoint de "upsert" de permanencia: el front hace GET-y-decide en
   `PermanenceService.setPercentage` (PATCH si existe `(activity, member)`, si no POST).
 - No hay endpoint para listar usuarios (el nombre de la cuenta de junta no se
@@ -200,6 +224,23 @@ solo `POST /api/auth/login` es `@Public()`.
   `MembersService`) para no cerrar el ciclo.
 - Specs con globals de Vitest.
 
+### Reglas de validación (fuente única por lado)
+
+- **Backend**: decoradores en los DTO + `utils/validation.util.ts` (`Trim()`,
+  límites, `DOCUMENT_TYPES`, `normalizeName`). Todo texto pasa por `Trim()` antes de
+  validar (un valor de solo espacios falla). Rangos: `weight` 1–100, `target` 0–100,
+  `percentage` 0–peso, `idEpik` ≥ 1; correo con `@IsEmail`; celular 7–15 dígitos;
+  documento 5–20 alfanuméricos; `documentType` ∈ `DOCUMENT_TYPES`; textos ≤ 255.
+  Nombres de grupo (global) y de comité/estado (por grupo) **únicos sin distinguir
+  mayúsculas ni espacios**. Estado y comités de un integrante deben ser de su grupo.
+- **Frontend**: mismas reglas en `utils/memberFormValidation.ts`
+  (`validateMemberField`, usada por el formulario **y** por la edición en línea de
+  la tabla), `utils/groupFormValidation.ts` y `constants/limits.ts`.
+- **Un campo numérico vacío nunca es 0**: en formularios es `NaN` (peso, objetivo)
+  y en la tabla de permanencia `null`. No uses `Number(input.value)` a secas.
+- **No se recortan valores en silencio**: lo que está fuera de rango se rechaza con
+  mensaje (ya no existe `clampPercentage`).
+
 ### Frontend
 
 - **Una clase-servicio por recurso**, métodos **estáticos**, `axios` directo,
@@ -210,6 +251,8 @@ solo `POST /api/auth/login` es `@Public()`.
   `committeeId`, `memberStatusId`, `committeeIds`, no objetos anidados.
 - `dtos/` = cuerpos de request. `CreateMemberDTO` manda escalares + `committeeIds` +
   `groupId` + `memberStatusId` (el backend orquesta `GroupMember` y las asociaciones).
+- `GroupService.registerGroup` borra el grupo recién creado si falla cualquier
+  paso posterior (junta, comités, estados), para no dejar grupos a medias.
 - Servicios que **orquestan varias llamadas**: `GroupService.registerGroup` /
   `updateGroupDetails` (helpers `reconcile()` para comités, `applyStatuses()` para
   estados con reasignación de miembros huérfanos al primer estado que sobrevive —
@@ -242,21 +285,30 @@ filas por miembro.
   ese grupo. Como el puntaje ya no se normaliza a 100, el `target` debe configurarse
   como el **porcentaje de puntos exigido** (p. ej. 30), no como 100.
 - **`meets` = `score >= target`** → fila **verde**; si no, **roja**.
-- `PermanenceTable.vue` muestra los valores como inputs `[0, weight]`;
-  `setValue` acota a ese rango y hace el upsert vía `PermanenceService.setPercentage`.
+- `PermanenceTable.vue` muestra los valores como inputs `[0, weight]`; una celda
+  sin registro se muestra **vacía** (`row.values[id] === null`), no como 0.
+  `setValue` **rechaza** (no acota) lo que no sea un entero en ese rango, hace el
+  upsert vía `PermanenceService.setPercentage` y, si la celda se vacía, borra el
+  registro con `clearPercentage`.
+- `PermanenceView` encadena los guardados y descarta las recargas de hoja viejas
+  (número de secuencia) para que una respuesta atrasada no pise datos nuevos.
+- La hoja muestra la suma de sus pesos; el formulario de actividad recibe
+  `availableWeight` y no deja pasar de 100.
 
 ---
 
 ## 8. Gotchas / limitaciones conocidas
 
-- **Tests preexistentes que fallan en árbol limpio** (no tocar sin querer
-  arreglarlos): `auth/auth.service.spec.ts` "should throw UnauthorizedException when
-  the user does not exist"; `activities/activities.service.spec.ts` fechas límite de
-  `getCurrentPeriod` (sensibles a zona horaria). Estado esperado: ~127 passing / 3
-  failing.
-- **`documentType` en el seed**: `member.seed.ts` guarda `'CC'` pero el front usa
-  nombres completos (`constants/documentTypes.ts`). El `<select>` no casa hasta
-  editar el miembro.
+- **Tests inestables**: los specs que hacen `vi.mock('bcrypt')`
+  (`unit/auth/auth.service.spec.ts` y un caso de `unit/users/users.service.spec.ts`)
+  a veces fallan con "is not a spy" según el orden de carga de módulos; no dependen
+  del código de negocio. Estado esperado: 283 passing.
+- **El puntaje de la hoja general puede pasar de 100**: suma los puntos generales
+  más los subtotales de los comités del integrante, y cada hoja puede sumar hasta
+  100 por separado. Los objetivos van de 0 a 100. Regla de negocio pendiente de
+  definir con Desarrollo Estudiantil (el seed usa 60 general + 40 por comité).
+- **`updateGroupDetails` no es atómico** (nombre → comités → estados en llamadas
+  separadas); el formulario valida todo antes para que no falle a la mitad.
 - **Sin scoping por grupo para `BOARD`**: un token de junta puede leer/escribir
   `members`/`activities`/`permanences` de cualquier grupo por API; el front solo lo
   restringe por rutas.

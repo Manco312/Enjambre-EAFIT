@@ -35,7 +35,11 @@ export class Committee {
   @OneToMany('Activity', 'committee')
   activities: Activity[];
 
-  @ManyToMany(() => Member, (member) => member.committees)
+  // onDelete va en el lado inverso: al borrar un comité se borran sus filas de
+  // committee_member (si no, la FK impide borrar comités con integrantes).
+  @ManyToMany(() => Member, (member) => member.committees, {
+    onDelete: 'CASCADE',
+  })
   members: Member[];
 
   @CreateDateColumn()

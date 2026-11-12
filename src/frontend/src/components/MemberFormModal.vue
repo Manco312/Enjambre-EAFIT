@@ -9,24 +9,14 @@ import AppTextField from '@/components/AppTextField.vue';
 import MultiSelect from '@/components/MultiSelect.vue';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { CreateMemberDTO } from '@/dtos/CreateMemberDTO';
-import type { DocumentType } from '@/types/DocumentType';
-import type { MemberFormErrors } from '@/utils/memberFormValidation';
+import type { MemberFormErrors, MemberFormValues } from '@/utils/memberFormValidation';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
-import type { Nullable } from '@/types/Nullable';
-import { DOCUMENT_TYPES, DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
+import { DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
+import { LIMITS } from '@/constants/limits';
 import { hasMemberFormErrors, validateMemberForm } from '@/utils/memberFormValidation';
 
 /* Types */
-interface MemberModalForm {
-  email: string;
-  idEpik: string;
-  fullName: string;
-  documentType: DocumentType;
-  documentNumber: string;
-  phone: string;
-  program: string;
-  secondProgram: string;
-  memberStatusId: Nullable<number>;
+interface MemberModalForm extends MemberFormValues {
   committeeNames: string[];
 }
 
@@ -56,12 +46,14 @@ watch(
 );
 
 /* Functions */
+// Todos los campos arrancan vacíos (también los selects) para que nada se
+// guarde con un valor que el usuario no eligió.
 function buildEmptyForm(): MemberModalForm {
   return {
     email: '',
     idEpik: '',
     fullName: '',
-    documentType: DOCUMENT_TYPES.CC,
+    documentType: '',
     documentNumber: '',
     phone: '',
     program: '',
@@ -88,23 +80,19 @@ function committeeIdsFromNames(names: string[]): number[] {
 }
 
 function handleSubmit(): void {
-  errors.value = validateMemberForm({
-    email: form.email,
-    idEpik: form.idEpik,
-    fullName: form.fullName,
-    documentNumber: form.documentNumber,
-    phone: form.phone,
-    program: form.program,
-    memberStatusId: form.memberStatusId,
-  });
-  if (hasMemberFormErrors(errors.value) || form.memberStatusId === null) {
+  errors.value = validateMemberForm(form);
+  if (
+    hasMemberFormErrors(errors.value) ||
+    form.memberStatusId === null ||
+    form.documentType === ''
+  ) {
     return;
   }
 
   emit('submit', {
     groupId: props.groupId,
     memberStatusId: form.memberStatusId,
-    idEpik: Number(form.idEpik),
+    idEpik: Number(form.idEpik.trim()),
     fullName: form.fullName.trim(),
     documentType: form.documentType,
     documentNumber: form.documentNumber.trim(),
@@ -145,7 +133,9 @@ function handleClose(): void {
           </button>
         </div>
 
-        <form class="mt-5 space-y-4" @submit.prevent="handleSubmit">
+        <!-- `novalidate`: la validación (y sus mensajes) la hace el formulario,
+             no el navegador. -->
+        <form class="mt-5 space-y-4" novalidate @submit.prevent="handleSubmit">
           <div class="grid gap-4 sm:grid-cols-2">
             <AppTextField
               id="member-email"
@@ -153,6 +143,7 @@ function handleClose(): void {
               label="Correo electrónico"
               type="email"
               placeholder="usuario@eafit.edu.co"
+              :maxlength="LIMITS.NAME_MAX_LENGTH"
               :error="errors.email"
               required
             />
@@ -160,6 +151,7 @@ function handleClose(): void {
               id="member-full-name"
               v-model="form.fullName"
               label="Nombre completo en mayúscula"
+              :maxlength="LIMITS.NAME_MAX_LENGTH"
               :error="errors.fullName"
               required
             />
@@ -178,17 +170,23 @@ function handleClose(): void {
               <select
                 id="member-doc-type"
                 v-model="form.documentType"
-                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                class="w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                :class="errors.documentType ? 'border-red-400' : 'border-slate-300'"
               >
+                <option value="" disabled>Selecciona un tipo</option>
                 <option v-for="option in DOCUMENT_TYPE_OPTIONS" :key="option" :value="option">
                   {{ option }}
                 </option>
               </select>
+              <p v-if="errors.documentType" class="text-xs font-medium text-red-500">
+                {{ errors.documentType }}
+              </p>
             </div>
             <AppTextField
               id="member-doc-number"
               v-model="form.documentNumber"
               label="Número de documento"
+              :maxlength="20"
               :error="errors.documentNumber"
               required
             />
@@ -196,13 +194,16 @@ function handleClose(): void {
               id="member-phone"
               v-model="form.phone"
               label="Celular"
+              :maxlength="15"
               :error="errors.phone"
+              required
             />
             <AppTextField
               id="member-program"
               v-model="form.program"
               label="Programa"
               placeholder="INGENIERÍA FÍSICA"
+              :maxlength="LIMITS.NAME_MAX_LENGTH"
               :error="errors.program"
               required
             />
@@ -210,6 +211,8 @@ function handleClose(): void {
               id="member-second-program"
               v-model="form.secondProgram"
               label="Programa #2"
+              :maxlength="LIMITS.NAME_MAX_LENGTH"
+              :error="errors.secondProgram"
             />
           </div>
 
@@ -231,6 +234,10 @@ function handleClose(): void {
             </select>
             <p v-if="errors.memberStatusId" class="text-xs font-medium text-red-500">
               {{ errors.memberStatusId }}
+            </p>
+            <p v-else-if="statuses.length === 0" class="text-xs font-medium text-red-500">
+              Este grupo no tiene estados de miembro. Un administrador debe crearlos al editar el
+              grupo antes de agregar integrantes.
             </p>
           </div>
 

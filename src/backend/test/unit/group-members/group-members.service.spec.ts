@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
-import { GroupMembersService } from '../../../src/groups/group-members.service.js'; 
-import { GroupMember } from '../../../src/groups/entities/group-member.entity.js'; 
-import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js'; 
-import { Group } from '../../../src/groups/entities/group.entity.js'; 
-import { GroupsService } from '../../../src/groups/groups.service.js'; 
+import { GroupMembersService } from '../../../src/groups/group-members.service.js';
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js';
+import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js';
+import { Group } from '../../../src/groups/entities/group.entity.js';
+import { GroupsService } from '../../../src/groups/groups.service.js';
 import { MemberStatusesService } from '../../../src/groups/member-statuses.service.js';
-import { Member } from '../../../src/members/entities/member.entity.js'; 
+import { Member } from '../../../src/members/entities/member.entity.js';
 
 describe('GroupMembersService', () => {
   let service: GroupMembersService;
@@ -90,7 +90,7 @@ describe('GroupMembersService', () => {
       const dto = { memberId: 1, groupId: 2, memberStatusId: 3 };
       const member = { id: 1 } as Member;
       const group = { id: 2 } as Group;
-      const memberStatus = { id: 3 } as MemberStatus;
+      const memberStatus = { id: 3, groupId: 2 } as MemberStatus;
       const groupMember = { id: 1, member, group, memberStatus } as GroupMember;
 
       vi.spyOn(repository, 'findOne').mockResolvedValue(null);
@@ -123,7 +123,7 @@ describe('GroupMembersService', () => {
 
       await expect(
         service.create({ memberId: 1, groupId: 2, memberStatusId: 3 }),
-      ).rejects.toThrow('Member 1 already belongs to group 2');
+      ).rejects.toThrow('El integrante ya pertenece a este grupo.');
 
       expect(membersRepository.findOneBy).not.toHaveBeenCalled();
       expect(repository.save).not.toHaveBeenCalled();
@@ -143,8 +143,8 @@ describe('GroupMembersService', () => {
 
   describe('update', () => {
     it('should reassign the member status', async () => {
-      const groupMember = { id: 1 } as GroupMember;
-      const memberStatus = { id: 5 } as MemberStatus;
+      const groupMember = { id: 1, groupId: 2 } as GroupMember;
+      const memberStatus = { id: 5, groupId: 2 } as MemberStatus;
 
       vi.spyOn(repository, 'findOneBy').mockResolvedValue(groupMember);
       vi.spyOn(memberStatusesService, 'findById').mockResolvedValue(
@@ -158,6 +158,22 @@ describe('GroupMembersService', () => {
       expect(groupMember.memberStatus).toBe(memberStatus);
       expect(repository.save).toHaveBeenCalledWith(groupMember);
       expect(result).toBe(groupMember);
+    });
+
+    it('should reject a status that belongs to another group', async () => {
+      const groupMember = { id: 1, groupId: 2 } as GroupMember;
+
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(groupMember);
+      vi.spyOn(memberStatusesService, 'findById').mockResolvedValue({
+        id: 5,
+        groupId: 9,
+      } as MemberStatus);
+
+      await expect(service.update(1, { memberStatusId: 5 })).rejects.toThrow(
+        'El estado de miembro seleccionado no pertenece a este grupo.',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when the membership does not exist', async () => {

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
@@ -7,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
 
 import { GroupMember } from './entities/group-member.entity.js';
+import { MemberStatus } from './entities/member-status.entity.js';
 import { Member } from '../members/entities/member.entity.js';
 import { CreateGroupMemberDto } from './dto/create-group-member.dto.js';
 import { UpdateGroupMemberDto } from './dto/update-group-member.dto.js';
@@ -73,9 +75,7 @@ export class GroupMembersService {
     );
 
     if (existingGroupMember) {
-      throw new ConflictException(
-        `Member ${memberId} already belongs to group ${groupId}`,
-      );
+      throw new ConflictException('El integrante ya pertenece a este grupo.');
     }
 
     const member = await this.membersRepository.findOneBy({ id: memberId });
@@ -87,6 +87,8 @@ export class GroupMembersService {
     const group = await this.groupsService.findById(groupId);
     const memberStatus =
       await this.memberStatusesService.findById(memberStatusId);
+
+    this.ensureStatusBelongsToGroup(memberStatus, groupId);
 
     const groupMember = this.groupMembersRepository.create({
       member,
@@ -108,9 +110,16 @@ export class GroupMembersService {
     }
 
     if (updateGroupMemberDto.memberStatusId) {
-      groupMember.memberStatus = await this.memberStatusesService.findById(
+      const memberStatus = await this.memberStatusesService.findById(
         updateGroupMemberDto.memberStatusId,
       );
+
+      this.ensureStatusBelongsToGroup(
+        memberStatus,
+        groupMember.group?.id ?? groupMember.groupId,
+      );
+
+      groupMember.memberStatus = memberStatus;
     }
 
     return await this.groupMembersRepository.save(groupMember);
@@ -118,5 +127,19 @@ export class GroupMembersService {
 
   async remove(id: number): Promise<DeleteResult> {
     return await this.groupMembersRepository.delete(id);
+  }
+
+  // Cada grupo define sus propios estados: no se puede asignar el de otro.
+  private ensureStatusBelongsToGroup(
+    memberStatus: MemberStatus,
+    groupId: number,
+  ): void {
+    const statusGroupId = memberStatus.group?.id ?? memberStatus.groupId;
+
+    if (statusGroupId !== groupId) {
+      throw new BadRequestException(
+        'El estado de miembro seleccionado no pertenece a este grupo.',
+      );
+    }
   }
 }

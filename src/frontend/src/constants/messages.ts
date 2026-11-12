@@ -4,6 +4,9 @@ export const ERROR_MESSAGES = {
   GROUP_NOT_FOUND: 'El grupo estudiantil no existe.',
   COMMITTEE_NOT_FOUND: 'El comité o departamento no existe.',
   USERNAME_TAKEN: 'El nombre de usuario ya está en uso.',
+  SESSION_EXPIRED: 'Tu sesión expiró. Inicia sesión de nuevo.',
+  FORBIDDEN: 'No tienes permiso para realizar esta acción.',
+  NETWORK: 'No se pudo conectar con el servidor. Revisa tu conexión.',
   UNKNOWN: 'Ocurrió un error inesperado. Intenta de nuevo.',
 } as const;
 

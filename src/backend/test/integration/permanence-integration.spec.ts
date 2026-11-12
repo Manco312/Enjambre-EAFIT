@@ -3,11 +3,13 @@ import 'dotenv/config';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
 import { TestAppModule } from './test-app.module.js';
 import { Group } from '../../src/groups/entities/group.entity.js';
+import { GroupMember } from '../../src/groups/entities/group-member.entity.js';
+import { MemberStatus } from '../../src/groups/entities/member-status.entity.js';
 import { Member } from '../../src/members/entities/member.entity.js';
 import { Activity } from '../../src/activities/entities/activity.entity.js';
 import { UsersService } from '../../src/users/users.service.js';
@@ -45,9 +47,7 @@ describe('Permanences integration', () => {
 
     usersService = module.get<UsersService>(UsersService);
 
-    groupsRepository = module.get<Repository<Group>>(
-      getRepositoryToken(Group),
-    );
+    groupsRepository = module.get<Repository<Group>>(getRepositoryToken(Group));
 
     membersRepository = module.get<Repository<Member>>(
       getRepositoryToken(Member),
@@ -69,7 +69,7 @@ describe('Permanences integration', () => {
       activitiesRepository.create({
         name: 'Permanences Test Activity',
         description: 'Activity used to attach permanences',
-        weight: 5,
+        weight: 90,
         period: '2026-1',
         group,
         committee: null,
@@ -80,7 +80,7 @@ describe('Permanences integration', () => {
       membersRepository.create({
         idEpik: 3001,
         fullName: 'Permanence Member One',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '3000000001',
         email: 'permanence.one@test.com',
         phone: '3200000001',
@@ -92,13 +92,27 @@ describe('Permanences integration', () => {
       membersRepository.create({
         idEpik: 3002,
         fullName: 'Permanence Member Two',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '3000000002',
         email: 'permanence.two@test.com',
         phone: '3200000002',
         program: 'Software Engineering',
       }),
     );
+
+    // Solo se puede puntuar a integrantes del grupo de la actividad.
+    const dataSource = module.get(DataSource);
+    const memberStatus = await dataSource.getRepository(MemberStatus).save({
+      name: 'Active',
+      target: 50,
+      group,
+    });
+
+    for (const groupMember of [member, secondMember]) {
+      await dataSource
+        .getRepository(GroupMember)
+        .save({ member: groupMember, group, memberStatus });
+    }
 
     await usersService.create({
       username: 'permanences.user',
@@ -121,6 +135,61 @@ describe('Permanences integration', () => {
     if (app) {
       await app.close();
     }
+  });
+
+  describe('validation', () => {
+    const post = (payload: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post('/api/permanences')
+        .set('Authorization', `Bearer ${token}`)
+        .send(payload);
+
+    it('should reject a score above the weight of the activity', async () => {
+      const response = await post({
+        percentage: 91,
+        memberId: member.id,
+        activityId: activity.id,
+      }).expect(400);
+
+      expect(response.body.message).toBe(
+        'El puntaje (91) no puede superar el peso de la actividad (90).',
+      );
+    });
+
+    it.each([
+      ['a negative score', -1],
+      ['a decimal score', 10.5],
+    ])('should reject %s', async (_label, percentage) => {
+      await post({
+        percentage,
+        memberId: member.id,
+        activityId: activity.id,
+      }).expect(400);
+    });
+
+    it('should reject a member that is not in the group of the activity', async () => {
+      const outsider = await membersRepository.save(
+        membersRepository.create({
+          idEpik: 3999,
+          fullName: 'Outsider',
+          documentType: 'Cédula de ciudadanía',
+          documentNumber: '3000003999',
+          email: 'outsider@test.com',
+          phone: '3200003999',
+          program: 'Software Engineering',
+        }),
+      );
+
+      const response = await post({
+        percentage: 10,
+        memberId: outsider.id,
+        activityId: activity.id,
+      }).expect(400);
+
+      expect(response.body.message).toBe(
+        'El integrante no pertenece al grupo de esta actividad.',
+      );
+    });
   });
 
   it('should create a permanence', async () => {
@@ -237,7 +306,7 @@ describe('Permanences integration', () => {
       activitiesRepository.create({
         name: 'Second Activity',
         description: 'Activity for the update test',
-        weight: 3,
+        weight: 70,
         period: '2026-1',
         group,
         committee: null,
@@ -275,7 +344,7 @@ describe('Permanences integration', () => {
       activitiesRepository.create({
         name: 'Third Activity',
         description: 'Activity for the delete test',
-        weight: 1,
+        weight: 30,
         period: '2026-1',
         group,
         committee: null,

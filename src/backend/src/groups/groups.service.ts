@@ -4,13 +4,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DeleteResult, Not } from 'typeorm';
+import { Repository, DeleteResult } from 'typeorm';
 
 import { Group } from './entities/group.entity.js';
 import { GroupMember } from './entities/group-member.entity.js';
 import { Member } from '../members/entities/member.entity.js';
 import { CreateGroupDto } from './dto/create-group.dto.js';
 import { UpdateGroupDto } from './dto/update-group.dto.js';
+import { normalizeName } from '../utils/validation.util.js';
 
 @Injectable()
 export class GroupsService {
@@ -81,17 +82,23 @@ export class GroupsService {
     });
   }
 
+  // La comparación ignora mayúsculas y espacios de los extremos: «SPIE» y
+  // « spie» son el mismo grupo.
   private async ensureNameIsAvailable(
     name: string,
     exceptId?: number,
   ): Promise<void> {
-    const existingGroup = await this.groupsRepository.findOneBy({
-      name,
-      ...(exceptId === undefined ? {} : { id: Not(exceptId) }),
-    });
+    const normalized = normalizeName(name);
+    const groups = await this.groupsRepository.find();
+    const isTaken = groups.some(
+      (group) =>
+        group.id !== exceptId && normalizeName(group.name) === normalized,
+    );
 
-    if (existingGroup) {
-      throw new ConflictException(`Group with name ${name} already exists`);
+    if (isTaken) {
+      throw new ConflictException(
+        `Ya existe un grupo estudiantil con el nombre «${name.trim()}».`,
+      );
     }
   }
 }

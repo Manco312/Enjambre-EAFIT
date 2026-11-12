@@ -1,6 +1,5 @@
 import {
   Injectable,
-  BadRequestException,
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
@@ -37,7 +36,7 @@ export class UsersService {
     const existingUser = await this.findOne(username);
 
     if (existingUser) {
-      throw new BadRequestException('The username is already in use');
+      throw new ConflictException('El nombre de usuario ya está en uso.');
     }
 
     const group = await this.groupsRepository.findOneBy({ id: groupId });
@@ -52,7 +51,7 @@ export class UsersService {
 
     if (groupHasUser) {
       throw new ConflictException(
-        `Group with id ${groupId} already has a board user`,
+        'El grupo ya tiene una cuenta de junta directiva.',
       );
     }
 

@@ -21,6 +21,7 @@ import { ActivityService } from '@/services/ActivityService';
 import { AuthService } from '@/services/AuthService';
 import { ExcelExportService } from '@/services/ExcelExportService';
 import { GroupService } from '@/services/GroupService';
+import { LIMITS } from '@/constants/limits';
 import { PermanenceSheetService } from '@/services/PermanenceSheetService';
 import { ROUTE_NAMES } from '@/constants/routeNames';
 import { ToastService } from '@/services/ToastService';
@@ -48,8 +49,11 @@ const sheet = ref<Nullable<PermanenceSheetView>>(null);
 const isAdminRoute = computed<boolean>(() => route.name === ROUTE_NAMES.ADMIN_GROUP_PERMANENCE);
 
 const groupId = computed<Nullable<number>>(() => {
+  // El administrador no pertenece a ningún grupo: el grupo sale de la URL. La
+  // junta directiva solo ve el suyo, que viene en la sesión.
   if (isAdminRoute.value) {
-    return Number(route.params.id);
+    const id = Number(route.params.id);
+    return Number.isInteger(id) && id > 0 ? id : null;
   }
   return AuthService.getSession()?.groupId ?? null;
 });
@@ -64,6 +68,20 @@ const deleteMessage = computed<string>(() =>
   activityPendingDelete.value === null
     ? ''
     : `Se eliminará la actividad «${activityPendingDelete.value.name}» y todos los valores registrados de los integrantes. Esta acción no se puede deshacer.`,
+);
+
+// Suma de los pesos de la hoja activa: como son porcentajes, el máximo es 100.
+const sheetWeightTotal = computed<number>(() =>
+  (sheet.value?.activityColumns ?? []).reduce(
+    (sum: number, activity: ActivityInterface) => sum + activity.weight,
+    0,
+  ),
+);
+
+// Lo que puede pesar la actividad del formulario sin que la hoja pase de 100:
+// al editar no se cuenta su propio peso actual.
+const availableWeight = computed<number>(
+  () => LIMITS.MAX_PERCENTAGE - sheetWeightTotal.value + (editingActivity.value?.weight ?? 0),
 );
 
 /* Watchers */
@@ -85,14 +103,29 @@ watch(groupId, () => {
 });
 
 /* Functions */
+// Cada carga de la hoja lleva un número de secuencia: si mientras llega la
+// respuesta se pidió otra carga más nueva, la vieja se descarta para que no
+// pise los datos recientes con valores anteriores.
+let sheetRequestId = 0;
+
+// Los guardados de celdas se encadenan para que lleguen a la API en el orden
+// en que se editaron.
+let saveQueue: Promise<void> = Promise.resolve();
+
 async function loadSheet(): Promise<void> {
   if (groupId.value === null) {
     return;
   }
+  const requestId = ++sheetRequestId;
   try {
-    sheet.value = await PermanenceSheetService.buildSheet(groupId.value, activeSheetKey.value);
+    const built = await PermanenceSheetService.buildSheet(groupId.value, activeSheetKey.value);
+    if (requestId === sheetRequestId) {
+      sheet.value = built;
+    }
   } catch (error: unknown) {
-    ToastService.error(resolveErrorMessage(error));
+    if (requestId === sheetRequestId) {
+      ToastService.error(resolveErrorMessage(error));
+    }
   }
 }
 
@@ -183,17 +216,21 @@ async function confirmDeleteActivity(): Promise<void> {
   }
 }
 
-async function onSetValue(activityId: number, memberId: number, value: number): Promise<void> {
+function onSetValue(activityId: number, memberId: number, value: Nullable<number>): void {
   const maxValue =
-    sheet.value?.activityColumns.find((activity) => activity.id === activityId)?.weight ?? 100;
-  try {
-    await PermanenceSheetService.setValue(activityId, memberId, value, maxValue);
-    ToastService.success('Cambios guardados.', 'permanence-save');
+    sheet.value?.activityColumns.find((activity) => activity.id === activityId)?.weight ??
+    LIMITS.MAX_PERCENTAGE;
+
+  saveQueue = saveQueue.then(async (): Promise<void> => {
+    try {
+      await PermanenceSheetService.setValue(activityId, memberId, value, maxValue);
+      ToastService.success('Cambios guardados.', 'permanence-save');
+    } catch (error: unknown) {
+      ToastService.error(resolveErrorMessage(error), 'permanence-save');
+    }
+    // Tras un error la recarga devuelve la celda al valor guardado.
     await loadSheet();
-  } catch (error: unknown) {
-    ToastService.error(resolveErrorMessage(error), 'permanence-save');
-    await loadSheet();
-  }
+  });
 }
 
 async function exportToExcel(): Promise<void> {
@@ -289,9 +326,18 @@ onMounted(() => {
       </div>
 
       <p class="text-xs text-slate-400">
-        En cada celda escribe los puntos obtenidos en esa actividad (máximo = su peso). El
-        <strong>puntaje</strong> es la suma de los puntos obtenidos en la hoja. Verde =
-        cumple el objetivo de su estado de miembro; rojo = no lo cumple.
+        En cada celda escribe los puntos obtenidos en esa actividad (número entero, máximo = su
+        peso); una celda vacía significa que aún no se ha calificado. El
+        <strong>puntaje</strong> es la suma de los puntos obtenidos en la hoja. Verde = cumple el
+        objetivo de su estado de miembro; rojo = no lo cumple.
+      </p>
+
+      <p
+        v-if="sheet !== null && sheet.activityColumns.length > 0"
+        class="text-xs font-semibold"
+        :class="sheetWeightTotal > LIMITS.MAX_PERCENTAGE ? 'text-red-600' : 'text-slate-500'"
+      >
+        Pesos de esta hoja: {{ sheetWeightTotal }}% de {{ LIMITS.MAX_PERCENTAGE }}%.
       </p>
 
       <PermanenceTable
@@ -306,6 +352,7 @@ onMounted(() => {
         :open="isFormOpen"
         :sheet-label="activeSheetLabel"
         :activity="editingActivity"
+        :available-weight="availableWeight"
         @submit="onFormSubmit"
         @close="isFormOpen = false"
       />

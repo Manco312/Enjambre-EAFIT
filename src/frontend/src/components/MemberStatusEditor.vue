@@ -2,6 +2,7 @@
 /* Internal Imports */
 import AppButton from '@/components/AppButton.vue';
 import type { MemberStatusDraft } from '@/types/MemberStatusDraft';
+import { LIMITS } from '@/constants/limits';
 
 /* Props */
 const props = withDefaults(defineProps<{ modelValue: MemberStatusDraft[]; error?: string }>(), {
@@ -23,19 +24,29 @@ function onNameInput(index: number, event: Event): void {
   patch(index, { name: (event.target as HTMLInputElement).value });
 }
 
+// Un campo vacío es NaN ("sin porcentaje"), nunca 0: así un porcentaje borrado
+// no se guarda como 0 por accidente y la validación puede pedirlo.
 function onPercentageInput(index: number, event: Event): void {
-  patch(index, { percentage: Number((event.target as HTMLInputElement).value) });
+  const raw = (event.target as HTMLInputElement).value.trim();
+  patch(index, { percentage: raw === '' ? Number.NaN : Number(raw) });
+}
+
+function percentageText(draft: MemberStatusDraft): string {
+  return Number.isNaN(draft.percentage) ? '' : String(draft.percentage);
 }
 
 function addItem(): void {
-  emit('update:modelValue', [...props.modelValue, { id: null, name: '', percentage: 0 }]);
+  emit('update:modelValue', [...props.modelValue, { id: null, name: '', percentage: Number.NaN }]);
 }
 
 function removeItem(index: number): void {
   const next = props.modelValue.filter(
     (_draft: MemberStatusDraft, draftIndex: number) => draftIndex !== index,
   );
-  emit('update:modelValue', next.length > 0 ? next : [{ id: null, name: '', percentage: 0 }]);
+  emit(
+    'update:modelValue',
+    next.length > 0 ? next : [{ id: null, name: '', percentage: Number.NaN }],
+  );
 }
 </script>
 
@@ -46,7 +57,8 @@ function removeItem(index: number): void {
         Estados de miembro y % de permanencia <span class="text-red-500">*</span>
       </label>
       <p class="text-xs text-slate-400">
-        Cada estado define el porcentaje de la tabla de permanencia que sus miembros deben cumplir.
+        Cada estado define el porcentaje de la tabla de permanencia que sus miembros deben cumplir
+        (número entero de 0 a {{ LIMITS.MAX_PERCENTAGE }}).
       </p>
     </div>
 
@@ -61,14 +73,17 @@ function removeItem(index: number): void {
         :value="draft.name"
         type="text"
         placeholder="Ej: ACTIVO"
+        :maxlength="LIMITS.NAME_MAX_LENGTH"
         class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         @input="onNameInput(index, $event)"
       />
       <input
-        :value="draft.percentage"
+        :value="percentageText(draft)"
         type="number"
         min="0"
-        max="100"
+        :max="LIMITS.MAX_PERCENTAGE"
+        step="1"
+        placeholder="%"
         class="w-28 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-right text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         @input="onPercentageInput(index, $event)"
       />

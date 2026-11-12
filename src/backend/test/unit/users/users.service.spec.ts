@@ -1,16 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 
-import { UsersService } from '../../../src/users/users.service.js'; 
-import { User } from '../../../src/users/entities/user.entity.js'; 
-import { Group } from '../../../src/groups/entities/group.entity.js'; 
+import { UsersService } from '../../../src/users/users.service.js';
+import { User } from '../../../src/users/entities/user.entity.js';
+import { Group } from '../../../src/groups/entities/group.entity.js';
 
 vi.mock('bcrypt', () => ({
   default: {
@@ -106,10 +102,10 @@ describe('UsersService', () => {
       expect(result).toBe(savedUser);
     });
 
-    it('should throw BadRequestException when the username is already in use', async () => {
+    it('should throw ConflictException when the username is already in use', async () => {
       vi.spyOn(usersRepository, 'findOne').mockResolvedValue({ id: 1 } as User);
 
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto)).rejects.toThrow(ConflictException);
       expect(usersRepository.save).not.toHaveBeenCalled();
     });
 

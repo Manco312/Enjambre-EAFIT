@@ -24,7 +24,7 @@ export class PermanenceService {
   // Upsert: si ya existe una permanencia para (actividad, miembro) la actualiza;
   // si no, la crea.
   public static async setPercentage(dto: SetPermanenceDTO): Promise<PermanenceInterface> {
-    const percentage = Math.max(0, Math.round(dto.percentage));
+    const percentage = dto.percentage;
     const existing = (await PermanenceService.getByActivityId(dto.activityId)).find(
       (permanence: PermanenceInterface) => permanence.memberId === dto.memberId,
     );
@@ -42,5 +42,16 @@ export class PermanenceService {
       percentage,
     });
     return data;
+  }
+
+  // Borra el puntaje de (actividad, miembro), si existe: la celda queda vacía.
+  public static async clearPercentage(activityId: number, memberId: number): Promise<void> {
+    const existing = (await PermanenceService.getByActivityId(activityId)).find(
+      (permanence: PermanenceInterface) => permanence.memberId === memberId,
+    );
+
+    if (existing !== undefined) {
+      await axios.delete(`${PERMANENCES_URL}/${existing.id}`);
+    }
   }
 }

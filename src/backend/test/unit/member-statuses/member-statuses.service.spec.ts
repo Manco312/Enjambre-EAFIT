@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, DeleteResult } from 'typeorm';
+import { Repository, DeleteResult, QueryFailedError } from 'typeorm';
+import { ConflictException } from '@nestjs/common';
 
 import { MemberStatusesService } from '../../../src/groups/member-statuses.service.js';
 import { MemberStatus } from '../../../src/groups/entities/member-status.entity.js';
@@ -19,7 +20,7 @@ describe('MemberStatusesService', () => {
         {
           provide: getRepositoryToken(MemberStatus),
           useValue: {
-            find: vi.fn(),
+            find: vi.fn().mockResolvedValue([]),
             findOneBy: vi.fn(),
             create: vi.fn(),
             save: vi.fn(),
@@ -115,6 +116,12 @@ describe('MemberStatusesService', () => {
     it('should update the scalar fields of a status', async () => {
       const status = { id: 1, name: 'ACTIVO', target: 90 } as MemberStatus;
 
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'ACTIVO',
+        target: 70,
+        groupId: 1,
+      } as MemberStatus);
       vi.spyOn(repository, 'preload').mockResolvedValue(status);
       vi.spyOn(repository, 'save').mockResolvedValue(status);
 
@@ -130,6 +137,12 @@ describe('MemberStatusesService', () => {
       const status = { id: 1, name: 'ACTIVO', target: 70 } as MemberStatus;
       const group = { id: 2, name: 'OE' } as Group;
 
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'ACTIVO',
+        target: 70,
+        groupId: 1,
+      } as MemberStatus);
       vi.spyOn(repository, 'preload').mockResolvedValue(status);
       vi.spyOn(groupsService, 'findById').mockResolvedValue(group);
       vi.spyOn(repository, 'save').mockResolvedValue(status);
@@ -152,7 +165,49 @@ describe('MemberStatusesService', () => {
     });
   });
 
+  describe('duplicate names', () => {
+    const existing = { id: 5, name: 'Activo', groupId: 1 } as MemberStatus;
+
+    it('should reject a new status whose name already exists in the group', async () => {
+      vi.spyOn(groupsService, 'findById').mockResolvedValue({
+        id: 1,
+      } as Group);
+      vi.spyOn(repository, 'find').mockResolvedValue([existing]);
+
+      await expect(
+        service.create({ name: 'ACTIVO', groupId: 1, target: 70 }),
+      ).rejects.toThrow(
+        'El grupo ya tiene un estado de miembro llamado «ACTIVO».',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject renaming a status to the name of another one', async () => {
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'LICENCIA',
+        groupId: 1,
+      } as MemberStatus);
+      vi.spyOn(repository, 'find').mockResolvedValue([existing]);
+
+      await expect(service.update(1, { name: 'activo' })).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe('remove', () => {
+    it('should report a conflict when the status still has members assigned', async () => {
+      vi.spyOn(repository, 'delete').mockRejectedValue(
+        new QueryFailedError('DELETE', [], new Error('FOREIGN KEY')),
+      );
+
+      await expect(service.remove(1)).rejects.toThrow(ConflictException);
+    });
+
     it('should delete a status', async () => {
       const deleteResult = { affected: 1, raw: {} } as DeleteResult;
 

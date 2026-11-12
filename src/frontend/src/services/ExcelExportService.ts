@@ -48,7 +48,8 @@ export class ExcelExportService {
       const body: CellValue[][] = sheet.rows.map((row: PermanenceRow) => {
         const cells: CellValue[] = [MemberService.getDisplayName(row.member), row.statusLabel];
         sheet.activityColumns.forEach((activity) => {
-          cells.push(row.values[activity.id] ?? 0);
+          // Sin puntaje registrado la celda queda vacía (no es lo mismo que 0).
+          cells.push(row.values[activity.id] ?? '');
         });
         sheet.subtotalColumns.forEach((subtotal) => {
           cells.push(Math.round(row.subtotals[subtotal.committeeId] ?? 0));

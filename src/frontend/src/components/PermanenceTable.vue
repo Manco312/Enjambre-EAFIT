@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* Internal Imports */
+import type { Nullable } from '@/types/Nullable';
 import type { PermanenceRow, PermanenceSheetView } from '@/services/PermanenceSheetService';
 import { MemberService } from '@/services/MemberService';
 
@@ -10,7 +11,8 @@ withDefaults(defineProps<{ sheet: PermanenceSheetView; readonly?: boolean }>(), 
 
 /* Emits */
 const emit = defineEmits<{
-  setValue: [activityId: number, memberId: number, value: number];
+  // `null` = celda vacía (se borra el puntaje registrado, si lo había).
+  setValue: [activityId: number, memberId: number, value: Nullable<number>];
   editActivity: [activityId: number];
   deleteActivity: [activityId: number];
 }>();
@@ -20,8 +22,15 @@ function roundPercentage(value: number): number {
   return Math.round(value);
 }
 
+// Una celda sin puntaje registrado se muestra vacía, no como 0.
+function valueText(row: PermanenceRow, activityId: number): string {
+  const value = row.values[activityId] ?? null;
+  return value === null ? '' : String(value);
+}
+
 function onValueInput(activityId: number, memberId: number, event: Event): void {
-  emit('setValue', activityId, memberId, Number((event.target as HTMLInputElement).value));
+  const raw = (event.target as HTMLInputElement).value.trim();
+  emit('setValue', activityId, memberId, raw === '' ? null : Number(raw));
 }
 
 function rowClass(row: PermanenceRow): string {
@@ -127,7 +136,8 @@ function rowClass(row: PermanenceRow): string {
           >
             <span class="flex items-center justify-end gap-1">
               <input
-                :value="row.values[activity.id] ?? 0"
+                :value="valueText(row, activity.id)"
+                placeholder="—"
                 type="number"
                 min="0"
                 :max="activity.weight"

@@ -5,7 +5,6 @@ import type { CreateActivityDTO } from '@/dtos/CreateActivityDTO';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateActivityDTO } from '@/dtos/UpdateActivityDTO';
 import { ENVIRONMENT } from '@/constants/environment';
-import { clampPercentage } from '@/utils/clampPercentage';
 
 const ACTIVITIES_URL = `${ENVIRONMENT.API_URL}/activities`;
 
@@ -47,7 +46,7 @@ export class ActivityService {
       committeeId: dto.committeeId,
       name: dto.name.trim(),
       description: dto.description.trim(),
-      weight: clampPercentage(dto.weight),
+      weight: dto.weight,
     });
     return data;
   }
@@ -59,7 +58,7 @@ export class ActivityService {
     const payload: UpdateActivityDTO = {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
       ...(dto.description !== undefined ? { description: dto.description.trim() } : {}),
-      ...(dto.weight !== undefined ? { weight: clampPercentage(dto.weight) } : {}),
+      ...(dto.weight !== undefined ? { weight: dto.weight } : {}),
     };
     const { data } = await axios.patch<ActivityInterface>(`${ACTIVITIES_URL}/${id}`, payload);
     return data;

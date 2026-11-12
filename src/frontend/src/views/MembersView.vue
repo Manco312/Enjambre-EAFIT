@@ -30,6 +30,15 @@ import { slugify } from '@/utils/slugify';
 /* Types */
 type ColumnFilters = Partial<Record<string, string>>;
 
+// Quitar a un integrante de un comité borra sus puntajes de permanencia en
+// ese comité, así que se pide confirmación antes de guardar.
+interface PendingCommitteeChange {
+  memberId: number;
+  memberName: string;
+  committeeIds: number[];
+  removedNames: string[];
+}
+
 /* Variables */
 const route = useRoute();
 const router = useRouter();
@@ -43,6 +52,7 @@ const isFormOpen = ref<boolean>(false);
 const isExporting = ref<boolean>(false);
 const isLoading = ref<boolean>(true);
 const memberPendingDelete = ref<Nullable<MemberWithMembership>>(null);
+const committeeChangePending = ref<Nullable<PendingCommitteeChange>>(null);
 
 const group = ref<Nullable<GroupInterface>>(null);
 const allMembers = ref<MemberWithMembership[]>([]);
@@ -53,8 +63,11 @@ const statuses = ref<MemberStatusInterface[]>([]);
 const isAdminRoute = computed<boolean>(() => route.name === ROUTE_NAMES.ADMIN_GROUP_MEMBERS);
 
 const groupId = computed<Nullable<number>>(() => {
+  // El administrador no pertenece a ningún grupo: el grupo sale de la URL. La
+  // junta directiva solo ve el suyo, que viene en la sesión.
   if (isAdminRoute.value) {
-    return Number(route.params.id);
+    const id = Number(route.params.id);
+    return Number.isInteger(id) && id > 0 ? id : null;
   }
   return AuthService.getSession()?.groupId ?? null;
 });
@@ -93,13 +106,17 @@ watch(groupId, () => {
 });
 
 /* Functions */
-async function load(): Promise<void> {
+// `silent` recarga los datos sin desmontar la tabla (no se pierde la página
+// ni el scroll); se usa para descartar una edición en línea que falló.
+async function load(silent: boolean = false): Promise<void> {
   if (groupId.value === null) {
     isLoading.value = false;
     return;
   }
 
-  isLoading.value = true;
+  if (!silent) {
+    isLoading.value = true;
+  }
   try {
     const [foundGroup, members, foundCommittees, foundStatuses] = await Promise.all([
       GroupService.getGroupById(groupId.value),
@@ -138,15 +155,69 @@ function patchLocalMember(id: number, changes: Partial<MemberWithMembership>): v
   );
 }
 
-async function onMemberUpdate(id: number, dto: UpdateMemberDTO): Promise<void> {
+async function saveMemberUpdate(id: number, dto: UpdateMemberDTO): Promise<void> {
   try {
-    await MemberService.updateMember(id, dto);
-    patchLocalMember(id, dto as Partial<MemberWithMembership>);
+    const updated = await MemberService.updateMember(id, dto);
+    // Se muestra lo que quedó guardado (la API normaliza nombre y correo), no
+    // lo que se escribió.
+    patchLocalMember(id, {
+      idEpik: updated.idEpik,
+      fullName: updated.fullName,
+      documentType: updated.documentType,
+      documentNumber: updated.documentNumber,
+      email: updated.email,
+      phone: updated.phone,
+      program: updated.program,
+      secondProgram: updated.secondProgram ?? '',
+      committeeIds: updated.committeeIds,
+    });
     ToastService.success('Cambios guardados.', 'member-inline-save');
   } catch (error: unknown) {
     ToastService.error(resolveErrorMessage(error), 'member-inline-save');
-    void load();
+    void load(true);
   }
+}
+
+async function onMemberUpdate(id: number, dto: UpdateMemberDTO): Promise<void> {
+  if (dto.committeeIds === undefined || groupId.value === null) {
+    await saveMemberUpdate(id, dto);
+    return;
+  }
+
+  const member = allMembers.value.find((item: MemberWithMembership) => item.id === id);
+  const nextIds = dto.committeeIds;
+  const removed = committees.value.filter(
+    (committee: CommitteeInterface) =>
+      member?.committeeIds.includes(committee.id) === true && !nextIds.includes(committee.id),
+  );
+
+  if (member === undefined || removed.length === 0) {
+    await saveMemberUpdate(id, { committeeIds: nextIds, groupId: groupId.value });
+    return;
+  }
+
+  committeeChangePending.value = {
+    memberId: id,
+    memberName: MemberService.getDisplayName(member),
+    committeeIds: nextIds,
+    removedNames: removed.map((committee: CommitteeInterface) => committee.name),
+  };
+}
+
+async function confirmCommitteeChange(): Promise<void> {
+  const pending = committeeChangePending.value;
+  committeeChangePending.value = null;
+  if (pending === null || groupId.value === null) {
+    return;
+  }
+  await saveMemberUpdate(pending.memberId, {
+    committeeIds: pending.committeeIds,
+    groupId: groupId.value,
+  });
+}
+
+function onInvalidEdit(message: string): void {
+  ToastService.error(message, 'member-inline-save');
 }
 
 async function onMemberStatusUpdate(id: number, memberStatusId: number): Promise<void> {
@@ -159,7 +230,7 @@ async function onMemberStatusUpdate(id: number, memberStatusId: number): Promise
     ToastService.success('Cambios guardados.', 'member-inline-save');
   } catch (error: unknown) {
     ToastService.error(resolveErrorMessage(error), 'member-inline-save');
-    void load();
+    void load(true);
   }
 }
 
@@ -171,15 +242,13 @@ function requestMemberDelete(id: number): void {
 async function confirmMemberDelete(): Promise<void> {
   const target = memberPendingDelete.value;
   memberPendingDelete.value = null;
-  if (target === null) {
+  if (target === null || groupId.value === null) {
     return;
   }
 
   try {
-    await MemberService.deleteMember(target.id);
-    ToastService.success(
-      `«${MemberService.getDisplayName(target)}» eliminado de la base de datos.`,
-    );
+    await MemberService.deleteMember(target.id, groupId.value);
+    ToastService.success(`«${MemberService.getDisplayName(target)}» eliminado del grupo.`);
     await load();
   } catch (error: unknown) {
     ToastService.error(resolveErrorMessage(error));
@@ -301,6 +370,7 @@ onMounted(() => {
         @update-status="onMemberStatusUpdate"
         @delete="requestMemberDelete"
         @filter-change="onFilterChange"
+        @invalid="onInvalidEdit"
       />
 
       <div class="flex items-center justify-between text-sm text-slate-500">
@@ -329,11 +399,21 @@ onMounted(() => {
       <ConfirmDialog
         :open="memberPendingDelete !== null"
         title="Eliminar integrante"
-        :message="`Se eliminará a «${memberPendingDelete !== null ? MemberService.getDisplayName(memberPendingDelete) : 'este integrante'}» de la base de datos. Esta acción no se puede deshacer.`"
+        :message="`Se eliminará a «${memberPendingDelete !== null ? MemberService.getDisplayName(memberPendingDelete) : 'este integrante'}» de este grupo, junto con sus puntajes de permanencia. Esta acción no se puede deshacer.`"
         confirm-label="Eliminar integrante"
         tone="danger"
         @confirm="confirmMemberDelete"
         @cancel="memberPendingDelete = null"
+      />
+
+      <ConfirmDialog
+        :open="committeeChangePending !== null"
+        title="Quitar del comité"
+        :message="`Al quitar a «${committeeChangePending?.memberName ?? 'este integrante'}» de ${committeeChangePending?.removedNames.join(', ') ?? 'el comité'} se borrarán los puntajes de permanencia que tenga en ese comité. Esta acción no se puede deshacer.`"
+        confirm-label="Quitar del comité"
+        tone="danger"
+        @confirm="confirmCommitteeChange"
+        @cancel="committeeChangePending = null"
       />
     </template>
   </section>

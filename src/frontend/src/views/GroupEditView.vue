@@ -37,7 +37,7 @@ const router = useRouter();
 const form = reactive<GroupEditForm>({
   name: '',
   committees: [{ id: null, name: '' }],
-  statuses: [{ id: null, name: '', percentage: 0 }],
+  statuses: [{ id: null, name: '', percentage: Number.NaN }],
 });
 const errors = ref<GroupFormErrors>({});
 const formError = ref<string>('');
@@ -60,7 +60,7 @@ function toStatusDrafts(items: MemberStatusInterface[]): MemberStatusDraft[] {
     name: item.name,
     percentage: item.target,
   }));
-  return drafts.length > 0 ? drafts : [{ id: null, name: '', percentage: 0 }];
+  return drafts.length > 0 ? drafts : [{ id: null, name: '', percentage: Number.NaN }];
 }
 
 async function loadGroup(): Promise<void> {
@@ -161,7 +161,8 @@ onMounted(() => {
         con su porcentaje de permanencia.
       </p>
 
-      <form class="mt-6 space-y-8" @submit.prevent="handleSubmit">
+      <!-- `novalidate`: la validación (y sus mensajes) la hace el formulario. -->
+      <form class="mt-6 space-y-8" novalidate @submit.prevent="handleSubmit">
         <div class="space-y-4">
           <AppTextField
             id="group-name"

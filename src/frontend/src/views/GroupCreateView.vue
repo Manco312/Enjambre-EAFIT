@@ -55,7 +55,9 @@ watch(
   () => form.name,
   (name: string): void => {
     const suggestion = slugify(name);
-    if (form.boardUsername === '' || form.boardUsername === lastSuggestedUsername.value) {
+    // Solo se sigue sugiriendo mientras el usuario no haya tocado el campo: si
+    // lo editó o lo borró, no se vuelve a llenar solo.
+    if (form.boardUsername === lastSuggestedUsername.value) {
       form.boardUsername = suggestion;
     }
     lastSuggestedUsername.value = suggestion;
@@ -120,7 +122,8 @@ function goBack(): void {
         permanencia y la cuenta de su junta directiva.
       </p>
 
-      <form class="mt-6 space-y-8" @submit.prevent="handleSubmit">
+      <!-- `novalidate`: la validación (y sus mensajes) la hace el formulario. -->
+      <form class="mt-6 space-y-8" novalidate @submit.prevent="handleSubmit">
         <div class="space-y-4">
           <h3 class="text-sm font-bold tracking-wide text-slate-400 uppercase">Datos del grupo</h3>
           <AppTextField
@@ -160,6 +163,7 @@ function goBack(): void {
               v-model="form.boardPassword"
               label="Contraseña"
               type="password"
+              autocomplete="new-password"
               placeholder="Mínimo 6 caracteres"
               :error="errors.boardPassword"
               required
@@ -169,6 +173,7 @@ function goBack(): void {
               v-model="form.boardPasswordConfirmation"
               label="Confirmar contraseña"
               type="password"
+              autocomplete="new-password"
               placeholder="Repite la contraseña"
               :error="errors.boardPasswordConfirmation"
               required

@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteResult } from 'typeorm';
 
-import { MembersController } from '../../../src/members/members.controller.js'; 
-import { MembersService } from '../../../src/members/members.service.js'; 
-import { Member } from '../../../src/members/entities/member.entity.js'; 
+import { MembersController } from '../../../src/members/members.controller.js';
+import { MembersService } from '../../../src/members/members.service.js';
+import { Member } from '../../../src/members/entities/member.entity.js';
 import { CreateMemberDto } from '../../../src/members/dto/create-member.dto.js';
-import { UpdateMemberDto } from '../../../src/members/dto/update-member.dto.js'; 
+import { UpdateMemberDto } from '../../../src/members/dto/update-member.dto.js';
 
 describe('MembersController', () => {
   let controller: MembersController;
@@ -118,9 +118,9 @@ describe('MembersController', () => {
 
       vi.spyOn(service, 'remove').mockResolvedValue(deleteResult);
 
-      const result = await controller.remove(1);
+      const result = await controller.remove(1, 2);
 
-      expect(service.remove).toHaveBeenCalledWith(1);
+      expect(service.remove).toHaveBeenCalledWith(1, 2);
       expect(result).toBe(deleteResult);
     });
   });

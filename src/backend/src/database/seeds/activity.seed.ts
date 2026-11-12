@@ -2,10 +2,39 @@ import { AppDataSource } from '../data-source.js';
 import { Activity } from '../../activities/entities/activity.entity.js';
 import { Group } from '../../groups/entities/group.entity.js';
 import { Committee } from '../../committees/entities/committee.entity.js';
+import { getCurrentPeriod } from '../../utils/period.util.js';
+
+// Pesos en %. Las actividades generales suman 60 y las de cada comité 40, de
+// modo que un integrante de un comité puede llegar a 100 puntos en total.
+const ACTIVITIES = [
+  {
+    name: 'Asistencia a asambleas',
+    description: 'Asistencia a las asambleas generales del grupo.',
+    weight: 30,
+    committeeName: null,
+  },
+  {
+    name: 'Participación en eventos',
+    description: 'Participación en los eventos organizados por el grupo.',
+    weight: 30,
+    committeeName: null,
+  },
+  {
+    name: 'Publicaciones en redes',
+    description: 'Publicaciones realizadas para las redes del grupo.',
+    weight: 40,
+    committeeName: 'Comité de Comunicaciones',
+  },
+  {
+    name: 'Informe de presupuesto',
+    description: 'Entrega del informe de presupuesto del semestre.',
+    weight: 40,
+    committeeName: 'Comité de Finanzas',
+  },
+];
 
 export async function seedActivities() {
   const repository = AppDataSource.getRepository(Activity);
-
   const groupRepository = AppDataSource.getRepository(Group);
   const committeeRepository = AppDataSource.getRepository(Committee);
 
@@ -19,37 +48,7 @@ export async function seedActivities() {
     throw new Error('No existe el grupo SPIE.');
   }
 
-  const communicationsCommittee = await committeeRepository.findOne({
-    where: {
-      name: 'Comité de Comunicaciones',
-      group: {
-        id: group.id,
-      },
-    },
-  });
-
-  if (!communicationsCommittee) {
-    throw new Error('No existe el Comité de Comunicaciones.');
-  }
-
-  const activitiesData = [
-    {
-      name: 'Actividad general',
-      description: 'Actividad perteneciente al grupo general.',
-      weight: 10,
-      period: '2026',
-      committee: null,
-    },
-    {
-      name: 'Actividad de comunicaciones',
-      description: 'Actividad del Comité de Comunicaciones.',
-      weight: 20,
-      period: '2026',
-      committee: communicationsCommittee,
-    },
-  ];
-
-  for (const data of activitiesData) {
+  for (const data of ACTIVITIES) {
     const existing = await repository.findOne({
       where: {
         name: data.name,
@@ -64,9 +63,30 @@ export async function seedActivities() {
       continue;
     }
 
+    let committee: Committee | null = null;
+
+    if (data.committeeName !== null) {
+      committee = await committeeRepository.findOne({
+        where: {
+          name: data.committeeName,
+          group: {
+            id: group.id,
+          },
+        },
+      });
+
+      if (!committee) {
+        throw new Error(`No existe el ${data.committeeName}.`);
+      }
+    }
+
     const activity = repository.create({
-      ...data,
+      name: data.name,
+      description: data.description,
+      weight: data.weight,
+      period: getCurrentPeriod(),
       group,
+      committee,
     });
 
     await repository.save(activity);

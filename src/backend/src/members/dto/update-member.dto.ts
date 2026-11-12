@@ -1,52 +1,15 @@
-import {
-  IsArray,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsInt, IsOptional } from 'class-validator';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
+import { CreateMemberDto } from './create-member.dto.js';
 
-export class UpdateMemberDto {
+// Mismas reglas que el alta, todas opcionales. El estado en el grupo se cambia
+// por `group-members`, no por aquí.
+export class UpdateMemberDto extends PartialType(
+  OmitType(CreateMemberDto, ['groupId', 'memberStatusId'] as const),
+) {
+  // Grupo al que se refieren los `committeeIds` enviados: solo se reemplazan
+  // los comités de ese grupo y se conservan los de los demás grupos del miembro.
   @IsOptional()
   @IsInt()
-  idEpik?: number;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  fullName?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  documentType?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  documentNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  program?: string;
-
-  @IsOptional()
-  @IsString()
-  secondProgram?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  committeeIds?: number[];
+  groupId?: number;
 }

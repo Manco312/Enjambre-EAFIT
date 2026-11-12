@@ -1,19 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
+import { ConflictException } from '@nestjs/common';
 
-import { PermanencesService } from '../../../src/permanences/permanences.service.js'; 
-import { Permanence } from '../../../src/permanences/entities/permanence.entity.js'; 
-import { MembersService } from '../../../src/members/members.service.js'; 
-import { ActivitiesService } from '../../../src/activities/activities.service.js'; 
+import { PermanencesService } from '../../../src/permanences/permanences.service.js';
+import { Permanence } from '../../../src/permanences/entities/permanence.entity.js';
+import { MembersService } from '../../../src/members/members.service.js';
+import { ActivitiesService } from '../../../src/activities/activities.service.js';
+import { GroupMembersService } from '../../../src/groups/group-members.service.js';
 import { Member } from '../../../src/members/entities/member.entity.js';
-import { Activity } from '../../../src/activities/entities/activity.entity.js'; 
+import { Activity } from '../../../src/activities/entities/activity.entity.js';
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js';
 
 describe('PermanencesService', () => {
   let service: PermanencesService;
   let repository: Repository<Permanence>;
   let membersService: MembersService;
   let activitiesService: ActivitiesService;
+  let groupMembersService: GroupMembersService;
+
+  // Miembro del grupo 1 y del comité 4; actividad general de peso 20.
+  const member = {
+    id: 1,
+    fullName: 'Member 1',
+    committees: [{ id: 4 }],
+  } as unknown as Member;
+
+  const activity = {
+    id: 2,
+    name: 'Activity 1',
+    weight: 20,
+    groupId: 1,
+    committeeId: null,
+  } as Activity;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -43,6 +62,14 @@ describe('PermanencesService', () => {
             findById: vi.fn(),
           },
         },
+        {
+          provide: GroupMembersService,
+          useValue: {
+            findByMemberAndGroup: vi
+              .fn()
+              .mockResolvedValue({ id: 1 } as GroupMember),
+          },
+        },
       ],
     }).compile();
 
@@ -53,6 +80,7 @@ describe('PermanencesService', () => {
 
     membersService = module.get<MembersService>(MembersService);
     activitiesService = module.get<ActivitiesService>(ActivitiesService);
+    groupMembersService = module.get<GroupMembersService>(GroupMembersService);
   });
 
   describe('list helpers', () => {
@@ -150,46 +178,26 @@ describe('PermanencesService', () => {
 
       const result = await service.findByMemberAndActivity(1, 2);
 
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: {
-          member: { id: 1 },
-          activity: { id: 2 },
-        },
-      });
-
       expect(result).toBeNull();
     });
   });
 
   describe('create', () => {
+    const dto = { percentage: 15, memberId: 1, activityId: 2 };
+
+    beforeEach(() => {
+      vi.spyOn(repository, 'findOne').mockResolvedValue(null);
+      vi.spyOn(membersService, 'findById').mockResolvedValue(member);
+      vi.spyOn(activitiesService, 'findById').mockResolvedValue(activity);
+    });
+
     it('should create and save a permanence', async () => {
-      const dto = {
-        percentage: 80,
-        memberId: 1,
-        activityId: 2,
-      };
-
-      const member = {
-        id: 1,
-        name: 'Member 1',
-      } as unknown as Member;
-
-      const activity = {
-        id: 2,
-        name: 'Activity 1',
-      } as Activity;
-
       const permanence = {
         id: 1,
-        percentage: 80,
+        percentage: 15,
         member,
         activity,
       } as Permanence;
-
-      vi.spyOn(repository, 'findOne').mockResolvedValue(null);
-
-      vi.spyOn(membersService, 'findById').mockResolvedValue(member);
-      vi.spyOn(activitiesService, 'findById').mockResolvedValue(activity);
 
       vi.spyOn(repository, 'create').mockReturnValue(permanence);
       vi.spyOn(repository, 'save').mockResolvedValue(permanence);
@@ -205,15 +213,67 @@ describe('PermanencesService', () => {
 
       expect(membersService.findById).toHaveBeenCalledWith(1);
       expect(activitiesService.findById).toHaveBeenCalledWith(2);
+      expect(groupMembersService.findByMemberAndGroup).toHaveBeenCalledWith(
+        1,
+        1,
+      );
 
       expect(repository.create).toHaveBeenCalledWith({
-        percentage: 80,
+        percentage: 15,
         member,
         activity,
       });
 
       expect(repository.save).toHaveBeenCalledWith(permanence);
       expect(result).toBe(permanence);
+    });
+
+    it('should accept a score equal to the activity weight', async () => {
+      await expect(
+        service.create({ ...dto, percentage: 20 }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should reject a score above the activity weight', async () => {
+      await expect(service.create({ ...dto, percentage: 21 })).rejects.toThrow(
+        'El puntaje (21) no puede superar el peso de la actividad (20).',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject a member that is not in the group of the activity', async () => {
+      vi.spyOn(groupMembersService, 'findByMemberAndGroup').mockResolvedValue(
+        null,
+      );
+
+      await expect(service.create(dto)).rejects.toThrow(
+        'El integrante no pertenece al grupo de esta actividad.',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject a member that is not in the committee of the activity', async () => {
+      vi.spyOn(activitiesService, 'findById').mockResolvedValue({
+        ...activity,
+        committeeId: 9,
+      } as Activity);
+
+      await expect(service.create(dto)).rejects.toThrow(
+        'El integrante no pertenece al comité de esta actividad.',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should accept a committee activity for a member of that committee', async () => {
+      vi.spyOn(activitiesService, 'findById').mockResolvedValue({
+        ...activity,
+        committeeId: 4,
+      } as Activity);
+
+      await expect(service.create(dto)).resolves.toBeUndefined();
     });
 
     it('should throw ConflictException when the permanence already exists', async () => {
@@ -224,136 +284,77 @@ describe('PermanencesService', () => {
 
       vi.spyOn(repository, 'findOne').mockResolvedValue(existingPermanence);
 
-      await expect(
-        service.create({
-          percentage: 90,
-          memberId: 1,
-          activityId: 2,
-        }),
-      ).rejects.toThrow(
-        'Permanence for member 1 and activity 2 already exists',
-      );
+      await expect(service.create(dto)).rejects.toThrow(ConflictException);
 
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: {
-          member: { id: 1 },
-          activity: { id: 2 },
-        },
-      });
-
-      expect(membersService.findById).not.toHaveBeenCalled();
-      expect(activitiesService.findById).not.toHaveBeenCalled();
       expect(repository.create).not.toHaveBeenCalled();
       expect(repository.save).not.toHaveBeenCalled();
     });
   });
 
   describe('update', () => {
+    const current = {
+      id: 1,
+      percentage: 5,
+      memberId: 1,
+      activityId: 2,
+    } as Permanence;
+
+    beforeEach(() => {
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(current);
+      vi.spyOn(membersService, 'findById').mockResolvedValue(member);
+      vi.spyOn(activitiesService, 'findById').mockResolvedValue(activity);
+    });
+
     it('should update an existing permanence', async () => {
       const permanence = {
         id: 1,
-        percentage: 50,
+        percentage: 5,
       } as Permanence;
-
-      const dto = {
-        percentage: 80,
-      };
 
       vi.spyOn(repository, 'preload').mockResolvedValue(permanence);
       vi.spyOn(repository, 'save').mockResolvedValue(permanence);
 
-      const result = await service.update(1, dto);
+      const result = await service.update(1, { percentage: 18 });
 
       expect(repository.preload).toHaveBeenCalledWith({
         id: 1,
-        percentage: 80,
+        percentage: 18,
       });
 
       expect(repository.save).toHaveBeenCalledWith(permanence);
       expect(result).toBe(permanence);
     });
 
-    it('should update the member when memberId is provided', async () => {
-      const permanence = {
+    it('should reject a score above the activity weight', async () => {
+      vi.spyOn(repository, 'preload').mockResolvedValue({
         id: 1,
-        percentage: 80,
-      } as Permanence;
+      } as Permanence);
 
-      const member = {
-        id: 2,
-        name: 'Member 2',
-      } as unknown as Member;
+      await expect(service.update(1, { percentage: 50 })).rejects.toThrow(
+        'El puntaje (50) no puede superar el peso de la actividad (20).',
+      );
 
-      vi.spyOn(repository, 'preload').mockResolvedValue(permanence);
-      vi.spyOn(membersService, 'findById').mockResolvedValue(member);
-      vi.spyOn(repository, 'save').mockResolvedValue(permanence);
-
-      const result = await service.update(1, {
-        memberId: 2,
-      });
-
-      expect(repository.preload).toHaveBeenCalledWith({
-        id: 1,
-      });
-
-      expect(membersService.findById).toHaveBeenCalledWith(2);
-      expect(permanence.member).toBe(member);
-
-      expect(repository.save).toHaveBeenCalledWith(permanence);
-      expect(result).toBe(permanence);
-    });
-
-    it('should update the activity when activityId is provided', async () => {
-      const permanence = {
-        id: 1,
-        percentage: 80,
-      } as Permanence;
-
-      const activity = {
-        id: 2,
-        name: 'Activity 2',
-      } as Activity;
-
-      vi.spyOn(repository, 'preload').mockResolvedValue(permanence);
-      vi.spyOn(activitiesService, 'findById').mockResolvedValue(activity);
-      vi.spyOn(repository, 'save').mockResolvedValue(permanence);
-
-      const result = await service.update(1, {
-        activityId: 2,
-      });
-
-      expect(repository.preload).toHaveBeenCalledWith({
-        id: 1,
-      });
-
-      expect(activitiesService.findById).toHaveBeenCalledWith(2);
-      expect(permanence.activity).toBe(activity);
-
-      expect(repository.save).toHaveBeenCalledWith(permanence);
-      expect(result).toBe(permanence);
+      expect(repository.save).not.toHaveBeenCalled();
     });
 
     it('should update member and activity when both are provided', async () => {
       const permanence = {
         id: 1,
-        percentage: 80,
+        percentage: 5,
       } as Permanence;
 
-      const member = {
-        id: 2,
-        name: 'Member 2',
-      } as unknown as Member;
-
-      const activity = {
+      const otherMember = { id: 2, committees: [] } as unknown as Member;
+      const otherActivity = {
         id: 3,
-        name: 'Activity 3',
+        weight: 10,
+        groupId: 1,
+        committeeId: null,
       } as Activity;
 
       vi.spyOn(repository, 'preload').mockResolvedValue(permanence);
-
-      vi.spyOn(membersService, 'findById').mockResolvedValue(member);
-      vi.spyOn(activitiesService, 'findById').mockResolvedValue(activity);
-
+      vi.spyOn(repository, 'findOne').mockResolvedValue(null);
+      vi.spyOn(membersService, 'findById').mockResolvedValue(otherMember);
+      vi.spyOn(activitiesService, 'findById').mockResolvedValue(otherActivity);
       vi.spyOn(repository, 'save').mockResolvedValue(permanence);
 
       const result = await service.update(1, {
@@ -364,15 +365,30 @@ describe('PermanencesService', () => {
       expect(membersService.findById).toHaveBeenCalledWith(2);
       expect(activitiesService.findById).toHaveBeenCalledWith(3);
 
-      expect(permanence.member).toBe(member);
-      expect(permanence.activity).toBe(activity);
+      expect(permanence.member).toBe(otherMember);
+      expect(permanence.activity).toBe(otherActivity);
 
       expect(repository.save).toHaveBeenCalledWith(permanence);
       expect(result).toBe(permanence);
     });
 
+    it('should reject moving the score onto a pair that already has one', async () => {
+      vi.spyOn(repository, 'preload').mockResolvedValue({
+        id: 1,
+      } as Permanence);
+      vi.spyOn(repository, 'findOne').mockResolvedValue({
+        id: 8,
+      } as Permanence);
+
+      await expect(service.update(1, { memberId: 2 })).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException when updating a non-existing permanence', async () => {
-      vi.spyOn(repository, 'preload').mockResolvedValue(undefined);
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(null);
 
       await expect(
         service.update(999, {
@@ -381,8 +397,6 @@ describe('PermanencesService', () => {
       ).rejects.toThrow('Permanence with id 999 not found');
 
       expect(repository.save).not.toHaveBeenCalled();
-      expect(membersService.findById).not.toHaveBeenCalled();
-      expect(activitiesService.findById).not.toHaveBeenCalled();
     });
   });
 

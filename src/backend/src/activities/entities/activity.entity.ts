@@ -27,7 +27,7 @@ export class Activity {
   @Column({ type: 'int' })
   weight: number;
 
-  @Column({ type: 'varchar', length: 5 })
+  @Column({ type: 'varchar', length: 6 })
   period: string;
 
   @ManyToOne(() => Group, (group) => group.activities, {

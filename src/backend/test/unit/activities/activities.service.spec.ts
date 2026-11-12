@@ -1,18 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 
 import { ActivitiesService } from '../../../src/activities/activities.service.js';
-import { GroupsService } from '../../../src/groups/groups.service.js'; 
+import { GroupsService } from '../../../src/groups/groups.service.js';
 import { CommitteesService } from '../../../src/committees/committees.service.js';
-import { Activity } from '../../../src/activities/entities/activity.entity.js'; 
-import { Group } from '../../../src/groups/entities/group.entity.js'; 
-import { Committee } from '../../../src/committees/entities/committee.entity.js'; 
-import { getCurrentPeriod } from '../../../src/utils/period.util.js'; 
+import { Activity } from '../../../src/activities/entities/activity.entity.js';
+import { Permanence } from '../../../src/permanences/entities/permanence.entity.js';
+import { Group } from '../../../src/groups/entities/group.entity.js';
+import { Committee } from '../../../src/committees/entities/committee.entity.js';
+import { getCurrentPeriod } from '../../../src/utils/period.util.js';
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;
   let repository: Repository<Activity>;
+  let permanencesRepository: Repository<Permanence>;
   let groupsService: GroupsService;
   let committeesService: CommitteesService;
 
@@ -23,12 +26,18 @@ describe('ActivitiesService', () => {
         {
           provide: getRepositoryToken(Activity),
           useValue: {
-            find: vi.fn(),
+            find: vi.fn().mockResolvedValue([]),
             findOneBy: vi.fn(),
             create: vi.fn(),
             save: vi.fn(),
             preload: vi.fn(),
             delete: vi.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Permanence),
+          useValue: {
+            find: vi.fn().mockResolvedValue([]),
           },
         },
         {
@@ -48,6 +57,9 @@ describe('ActivitiesService', () => {
 
     service = module.get<ActivitiesService>(ActivitiesService);
     repository = module.get<Repository<Activity>>(getRepositoryToken(Activity));
+    permanencesRepository = module.get<Repository<Permanence>>(
+      getRepositoryToken(Permanence),
+    );
 
     groupsService = module.get<GroupsService>(GroupsService);
     committeesService = module.get<CommitteesService>(CommitteesService);
@@ -144,6 +156,7 @@ describe('ActivitiesService', () => {
     const committee = {
       id: 1,
       name: 'Committee 1',
+      groupId: 1,
     } as Committee;
 
     const activity = {
@@ -242,6 +255,12 @@ describe('ActivitiesService', () => {
       weight: 20,
     };
 
+    vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+      id: 1,
+      weight: 10,
+      groupId: 1,
+      committeeId: null,
+    } as Activity);
     vi.spyOn(repository, 'preload').mockResolvedValue(activity);
     vi.spyOn(repository, 'save').mockResolvedValue(activity);
 
@@ -266,6 +285,87 @@ describe('ActivitiesService', () => {
     );
 
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  describe('validation rules', () => {
+    const group = { id: 1, name: 'Group 1' } as Group;
+    const baseDto = {
+      name: 'Activity 1',
+      weight: 30,
+      groupId: 1,
+      committeeId: null,
+    };
+
+    beforeEach(() => {
+      vi.spyOn(groupsService, 'findById').mockResolvedValue(group);
+    });
+
+    it('should store an empty description when none is sent', async () => {
+      await service.create(baseDto);
+
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ description: '' }),
+      );
+    });
+
+    it('should reject an activity that pushes the sheet over 100%', async () => {
+      vi.spyOn(repository, 'find').mockResolvedValue([
+        { id: 2, weight: 50 },
+        { id: 3, weight: 30 },
+      ] as Activity[]);
+
+      await expect(service.create(baseDto)).rejects.toThrow(
+        'Los pesos de las actividades de la hoja no pueden sumar más de 100%. Disponible: 20%.',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should not count the activity itself when updating its weight', async () => {
+      const current = { id: 2, weight: 50, groupId: 1, committeeId: null };
+
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(current as Activity);
+      vi.spyOn(repository, 'preload').mockResolvedValue(current as Activity);
+      vi.spyOn(repository, 'find').mockResolvedValue([
+        current,
+        { id: 3, weight: 30 },
+      ] as Activity[]);
+
+      await expect(service.update(2, { weight: 70 })).resolves.toBeUndefined();
+      await expect(service.update(2, { weight: 71 })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should reject a committee that belongs to another group', async () => {
+      vi.spyOn(committeesService, 'findById').mockResolvedValue({
+        id: 4,
+        groupId: 9,
+      } as Committee);
+
+      await expect(
+        service.create({ ...baseDto, committeeId: 4 }),
+      ).rejects.toThrow('El comité de la actividad no pertenece a este grupo.');
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject lowering the weight below a recorded score', async () => {
+      const current = { id: 2, weight: 50, groupId: 1, committeeId: null };
+
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(current as Activity);
+      vi.spyOn(repository, 'preload').mockResolvedValue(current as Activity);
+      vi.spyOn(permanencesRepository, 'find').mockResolvedValue([
+        { percentage: 12 },
+        { percentage: 40 },
+      ] as Permanence[]);
+
+      await expect(service.update(2, { weight: 20 })).rejects.toThrow(
+        'No se puede bajar el peso a 20%: hay integrantes con hasta 40 puntos en esta actividad. Ajusta primero esos puntajes.',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
   });
 
   // Test 7

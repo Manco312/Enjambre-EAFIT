@@ -19,7 +19,7 @@ describe('CommitteesService', () => {
         {
           provide: getRepositoryToken(Committee),
           useValue: {
-            find: vi.fn(),
+            find: vi.fn().mockResolvedValue([]),
             findOneBy: vi.fn(),
             create: vi.fn(),
             save: vi.fn(),
@@ -109,6 +109,11 @@ describe('CommitteesService', () => {
     it('should update the name of a committee', async () => {
       const committee = { id: 1, name: 'New name' } as Committee;
 
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'DIVULGACIÓN',
+        groupId: 1,
+      } as Committee);
       vi.spyOn(repository, 'preload').mockResolvedValue(committee);
       vi.spyOn(repository, 'save').mockResolvedValue(committee);
 
@@ -127,6 +132,11 @@ describe('CommitteesService', () => {
       const committee = { id: 1, name: 'DIVULGACIÓN' } as Committee;
       const group = { id: 2, name: 'OE' } as Group;
 
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'DIVULGACIÓN',
+        groupId: 1,
+      } as Committee);
       vi.spyOn(repository, 'preload').mockResolvedValue(committee);
       vi.spyOn(groupsService, 'findById').mockResolvedValue(group);
       vi.spyOn(repository, 'save').mockResolvedValue(committee);
@@ -146,6 +156,51 @@ describe('CommitteesService', () => {
       );
 
       expect(repository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('duplicate names', () => {
+    const existing = { id: 5, name: 'Divulgación', groupId: 1 } as Committee;
+
+    it('should reject a new committee whose name already exists in the group', async () => {
+      vi.spyOn(groupsService, 'findById').mockResolvedValue({
+        id: 1,
+      } as Group);
+      vi.spyOn(repository, 'find').mockResolvedValue([existing]);
+
+      await expect(
+        service.create({ name: ' DIVULGACIÓN ', groupId: 1 }),
+      ).rejects.toThrow('El grupo ya tiene un comité llamado «DIVULGACIÓN».');
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject renaming a committee to the name of another one', async () => {
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue({
+        id: 1,
+        name: 'FINANZAS',
+        groupId: 1,
+      } as Committee);
+      vi.spyOn(repository, 'find').mockResolvedValue([existing]);
+
+      await expect(service.update(1, { name: 'divulgación' })).rejects.toThrow(
+        'El grupo ya tiene un comité llamado «divulgación».',
+      );
+
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should allow saving a committee with its own current name', async () => {
+      const committee = { id: 5, name: 'Divulgación' } as Committee;
+
+      vi.spyOn(repository, 'findOneBy').mockResolvedValue(existing);
+      vi.spyOn(repository, 'find').mockResolvedValue([existing]);
+      vi.spyOn(repository, 'preload').mockResolvedValue(committee);
+      vi.spyOn(repository, 'save').mockResolvedValue(committee);
+
+      await expect(service.update(5, { name: 'Divulgación' })).resolves.toBe(
+        committee,
+      );
     });
   });
 

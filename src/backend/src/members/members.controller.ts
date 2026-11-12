@@ -47,8 +47,13 @@ export class MembersController {
     return await this.membersService.update(id, updateMemberDto);
   }
 
+  // Con `groupId` solo se saca al integrante de ese grupo (y se borra del todo
+  // si no pertenece a ningún otro). Sin `groupId` se borra de todos los grupos.
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<DeleteResult> {
-    return await this.membersService.remove(id);
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('groupId', new ParseIntPipe({ optional: true })) groupId?: number,
+  ): Promise<DeleteResult> {
+    return await this.membersService.remove(id, groupId);
   }
 }

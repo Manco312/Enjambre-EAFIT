@@ -12,6 +12,7 @@ import type { UpdateMemberDTO } from '@/dtos/UpdateMemberDTO';
 import { DOCUMENT_TYPE_OPTIONS } from '@/constants/documentTypes';
 import { MEMBER_COLUMNS } from '@/constants/memberColumns';
 import { MemberService } from '@/services/MemberService';
+import { isMemberTextField, validateMemberField } from '@/utils/memberFormValidation';
 
 /* Props */
 const props = withDefaults(
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   updateStatus: [id: number, memberStatusId: number];
   delete: [id: number];
   filterChange: [key: string, value: string];
+  invalid: [message: string];
 }>();
 
 /* Selectors */
@@ -53,9 +55,31 @@ function onFilterInput(key: string, event: Event): void {
   emit('filterChange', key, target.value);
 }
 
+// La edición en línea aplica las mismas reglas que el formulario de alta. Si el
+// valor no es válido se avisa y la celda vuelve a mostrar lo que hay guardado.
 function onTextInput(member: MemberWithMembership, key: string, event: Event): void {
   const target = event.target as HTMLInputElement;
-  const value = key === 'idEpik' ? Number(target.value) : target.value;
+  const previous = cellText(member, key);
+  const next = target.value.trim();
+
+  if (!isMemberTextField(key)) {
+    target.value = previous;
+    return;
+  }
+
+  const error = validateMemberField(key, next);
+  if (error !== undefined) {
+    target.value = previous;
+    emit('invalid', error);
+    return;
+  }
+
+  target.value = next;
+  if (next === previous) {
+    return;
+  }
+
+  const value = key === 'idEpik' ? Number(next) : next;
   emit('update', member.id, { [key]: value } as UpdateMemberDTO);
 }
 

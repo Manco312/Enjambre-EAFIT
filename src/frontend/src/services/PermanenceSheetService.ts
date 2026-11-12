@@ -1,12 +1,14 @@
 import type { ActivityInterface } from '@/interfaces/ActivityInterface';
 import type { CommitteeInterface } from '@/interfaces/CommitteeInterface';
 import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
+import type { Nullable } from '@/types/Nullable';
 import type { PermanenceInterface } from '@/interfaces/PermanenceInterface';
 import { ActivityService } from '@/services/ActivityService';
 import { CommitteeService } from '@/services/CommitteeService';
 import { MemberService, type MemberWithMembership } from '@/services/MemberService';
 import { MemberStatusService } from '@/services/MemberStatusService';
 import { PermanenceService } from '@/services/PermanenceService';
+import { ValidationError } from '@/utils/ValidationError';
 
 export type PermanenceSheetKey = 'general' | number;
 
@@ -23,7 +25,8 @@ export interface PermanenceSubtotalColumn {
 export interface PermanenceRow {
   member: MemberWithMembership;
   statusLabel: string;
-  values: Record<number, number>;
+  // Puntos por actividad; `null` = todavía no se ha registrado un puntaje.
+  values: Record<number, Nullable<number>>;
   subtotals: Record<number, number>;
   total: number;
   maxTotal: number;
@@ -65,12 +68,23 @@ export class PermanenceSheetService {
   public static async setValue(
     activityId: number,
     memberId: number,
-    value: number,
+    value: Nullable<number>,
     maxValue: number,
   ): Promise<void> {
-    const safeValue = Number.isNaN(value) ? 0 : value;
-    const bounded = Math.min(maxValue, Math.max(0, Math.round(safeValue)));
-    await PermanenceService.setPercentage({ activityId, memberId, percentage: bounded });
+    // Celda vacía: se borra el puntaje en vez de guardar un 0.
+    if (value === null) {
+      await PermanenceService.clearPercentage(activityId, memberId);
+      return;
+    }
+
+    // Un valor fuera de rango se rechaza; no se recorta en silencio.
+    if (!Number.isInteger(value) || value < 0 || value > maxValue) {
+      throw new ValidationError(
+        `El puntaje debe ser un número entero entre 0 y ${maxValue} (el peso de la actividad).`,
+      );
+    }
+
+    await PermanenceService.setPercentage({ activityId, memberId, percentage: value });
   }
 
   public static async buildSheet(
@@ -200,14 +214,14 @@ export class PermanenceSheetService {
     activities: ActivityInterface[],
     memberId: number,
     permanences: PermanenceInterface[],
-  ): Record<number, number> {
-    const values: Record<number, number> = {};
+  ): Record<number, Nullable<number>> {
+    const values: Record<number, Nullable<number>> = {};
     activities.forEach((activity: ActivityInterface) => {
       values[activity.id] =
         permanences.find(
           (permanence: PermanenceInterface) =>
             permanence.activityId === activity.id && permanence.memberId === memberId,
-        )?.percentage ?? 0;
+        )?.percentage ?? null;
     });
     return values;
   }
@@ -216,7 +230,7 @@ export class PermanenceSheetService {
   // por lo que el total de una hoja es simplemente su suma.
   private static sumValues(
     activities: ActivityInterface[],
-    values: Record<number, number>,
+    values: Record<number, Nullable<number>>,
   ): number {
     return activities.reduce(
       (sum: number, activity: ActivityInterface) => sum + (values[activity.id] ?? 0),

@@ -13,7 +13,7 @@ import { DomainError } from '@/utils/DomainError';
 import { ENVIRONMENT } from '@/constants/environment';
 import { MemberStatusService } from '@/services/MemberStatusService';
 import { UserService } from '@/services/UserService';
-import { clampPercentage } from '@/utils/clampPercentage';
+import { normalizeName } from '@/utils/normalizeName';
 
 export interface UpdateGroupDetailsDTO {
   name: string;
@@ -83,35 +83,45 @@ export class GroupService {
 
     const group = await GroupService.createGroup({ name: dto.name });
 
+    // El alta son varias llamadas seguidas. Si cualquiera falla se borra el
+    // grupo recién creado (el backend cascadea su junta, comités y estados)
+    // para no dejar un grupo a medias con el nombre ya ocupado.
+    try {
+      await GroupService.createBoardUser(group.id, dto);
+      await GroupService.applyCommittees(
+        group.id,
+        dto.committeeNames.map((name: string) => ({ id: null, name })),
+      );
+      await GroupService.applyStatuses(
+        group.id,
+        dto.statuses.map((status) => ({
+          id: null,
+          name: status.name,
+          percentage: status.percentage,
+        })),
+      );
+    } catch (error: unknown) {
+      await GroupService.deleteGroup(group.id).catch(() => undefined);
+      throw error;
+    }
+
+    return group;
+  }
+
+  private static async createBoardUser(groupId: number, dto: RegisterGroupDTO): Promise<void> {
     try {
       await UserService.createUser({
         username: dto.boardUsername,
         password: dto.boardPassword,
-        groupId: group.id,
+        groupId,
       });
     } catch (error: unknown) {
-      // Rollback: el usuario no se creó, borramos el grupo recién hecho.
-      await GroupService.deleteGroup(group.id).catch(() => undefined);
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
+      // El grupo es nuevo, así que un 409 solo puede ser el usuario repetido.
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
         throw new DomainError('USERNAME_TAKEN');
       }
       throw error;
     }
-
-    await GroupService.applyCommittees(
-      group.id,
-      dto.committeeNames.map((name: string) => ({ id: null, name })),
-    );
-    await GroupService.applyStatuses(
-      group.id,
-      dto.statuses.map((status) => ({
-        id: null,
-        name: status.name,
-        percentage: status.percentage,
-      })),
-    );
-
-    return group;
   }
 
   public static async updateGroup(id: number, dto: UpdateGroupDTO): Promise<GroupInterface> {
@@ -168,13 +178,34 @@ export class GroupService {
   }
 
   private static async applyStatuses(groupId: number, drafts: MemberStatusDraft[]): Promise<void> {
-    const cleaned = drafts
+    const existing = await MemberStatusService.getMemberStatusesByGroupId(groupId);
+
+    // Los porcentajes ya vienen validados por el formulario (enteros 0-100).
+    const named = drafts
       .map((draft: MemberStatusDraft) => ({
         id: draft.id,
         name: draft.name.trim(),
-        percentage: clampPercentage(draft.percentage),
+        percentage: draft.percentage,
       }))
       .filter((draft) => draft.name.length > 0);
+
+    const explicitIds = named
+      .map((draft) => draft.id)
+      .filter((id: Nullable<number>): id is number => id !== null);
+
+    // Si se quitó un estado y se agregó otro con el mismo nombre, es el mismo
+    // estado: se reutiliza su id en vez de crear un duplicado.
+    const cleaned = named.map((draft) => {
+      if (draft.id !== null) {
+        return draft;
+      }
+      const sameName = existing.find(
+        (status) =>
+          !explicitIds.includes(status.id) &&
+          normalizeName(status.name) === normalizeName(draft.name),
+      );
+      return sameName === undefined ? draft : { ...draft, id: sameName.id };
+    });
 
     const keptIds = cleaned
       .map((draft) => draft.id)
@@ -193,7 +224,6 @@ export class GroupService {
     }
 
     const fallbackStatusId = survivingIds[0] ?? null;
-    const existing = await MemberStatusService.getMemberStatusesByGroupId(groupId);
     for (const status of existing.filter((status) => !keptIds.includes(status.id))) {
       if (fallbackStatusId !== null) {
         await GroupService.reassignStatus(groupId, status.id, fallbackStatusId);

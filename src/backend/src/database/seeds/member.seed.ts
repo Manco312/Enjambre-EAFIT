@@ -1,6 +1,8 @@
 import { AppDataSource } from '../data-source.js';
 import { Member } from '../../members/entities/member.entity.js';
 
+// Datos ficticios. `documentType` usa los mismos valores que valida la API y
+// muestra el frontend (ver utils/validation.util.ts).
 export async function seedMembers() {
   const repository = AppDataSource.getRepository(Member);
 
@@ -8,7 +10,7 @@ export async function seedMembers() {
     {
       idEpik: 1001,
       fullName: 'Juan Pérez',
-      documentType: 'CC',
+      documentType: 'Cédula de ciudadanía',
       documentNumber: '100000001',
       email: 'juan@example.com',
       phone: '3000000001',
@@ -18,7 +20,7 @@ export async function seedMembers() {
     {
       idEpik: 1002,
       fullName: 'María Gómez',
-      documentType: 'CC',
+      documentType: 'Cédula de ciudadanía',
       documentNumber: '100000002',
       email: 'maria@example.com',
       phone: '3000000002',

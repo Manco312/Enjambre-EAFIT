@@ -12,6 +12,7 @@ withDefaults(
     placeholder?: string;
     required?: boolean;
     autocomplete?: string;
+    maxlength?: number;
     error?: string;
     hint?: string;
   }>(),
@@ -20,6 +21,7 @@ withDefaults(
     placeholder: '',
     required: false,
     autocomplete: 'off',
+    maxlength: undefined,
     error: '',
     hint: '',
   },
@@ -48,6 +50,7 @@ function handleInput(event: Event): void {
       :placeholder="placeholder"
       :required="required"
       :autocomplete="autocomplete"
+      :maxlength="maxlength"
       class="w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
       :class="error ? 'border-red-400' : 'border-slate-300'"
       @input="handleInput"

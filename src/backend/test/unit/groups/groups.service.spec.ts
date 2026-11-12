@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DeleteResult } from 'typeorm';
+import { ConflictException } from '@nestjs/common';
 
-import { GroupsService } from '../../../src/groups/groups.service.js'; 
-import { Group } from '../../../src/groups/entities/group.entity.js'; 
-import { GroupMember } from '../../../src/groups/entities/group-member.entity.js'; 
+import { GroupsService } from '../../../src/groups/groups.service.js';
+import { Group } from '../../../src/groups/entities/group.entity.js';
+import { GroupMember } from '../../../src/groups/entities/group-member.entity.js';
 import { Member } from '../../../src/members/entities/member.entity.js';
 
 describe('GroupsService', () => {
@@ -89,13 +90,13 @@ describe('GroupsService', () => {
       const dto = { name: 'SPIE' };
       const group = { id: 1, name: 'SPIE' } as Group;
 
-      vi.spyOn(repository, 'findOneBy').mockResolvedValue(null);
+      vi.spyOn(repository, 'find').mockResolvedValue([]);
       vi.spyOn(repository, 'create').mockReturnValue(group);
       vi.spyOn(repository, 'save').mockResolvedValue(group);
 
       const result = await service.create(dto);
 
-      expect(repository.findOneBy).toHaveBeenCalledWith({ name: 'SPIE' });
+      expect(repository.find).toHaveBeenCalledWith();
       expect(repository.create).toHaveBeenCalledWith(dto);
       expect(repository.save).toHaveBeenCalledWith(group);
       expect(result).toBe(group);
@@ -104,13 +105,25 @@ describe('GroupsService', () => {
     it('should throw ConflictException when the name is already taken', async () => {
       const existingGroup = { id: 1, name: 'SPIE' } as Group;
 
-      vi.spyOn(repository, 'findOneBy').mockResolvedValue(existingGroup);
+      vi.spyOn(repository, 'find').mockResolvedValue([existingGroup]);
 
       await expect(service.create({ name: 'SPIE' })).rejects.toThrow(
-        'Group with name SPIE already exists',
+        'Ya existe un grupo estudiantil con el nombre «SPIE».',
       );
 
       expect(repository.create).not.toHaveBeenCalled();
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should ignore case and surrounding spaces when checking the name', async () => {
+      const existingGroup = { id: 1, name: 'SPIE' } as Group;
+
+      vi.spyOn(repository, 'find').mockResolvedValue([existingGroup]);
+
+      await expect(service.create({ name: ' spie ' })).rejects.toThrow(
+        ConflictException,
+      );
+
       expect(repository.save).not.toHaveBeenCalled();
     });
   });
@@ -119,7 +132,7 @@ describe('GroupsService', () => {
     it('should update an existing group', async () => {
       const group = { id: 1, name: 'New name' } as Group;
 
-      vi.spyOn(repository, 'findOneBy').mockResolvedValue(null);
+      vi.spyOn(repository, 'find').mockResolvedValue([group]);
       vi.spyOn(repository, 'preload').mockResolvedValue(group);
       vi.spyOn(repository, 'save').mockResolvedValue(group);
 
@@ -136,17 +149,17 @@ describe('GroupsService', () => {
     it('should throw ConflictException when the new name belongs to another group', async () => {
       const otherGroup = { id: 2, name: 'New name' } as Group;
 
-      vi.spyOn(repository, 'findOneBy').mockResolvedValue(otherGroup);
+      vi.spyOn(repository, 'find').mockResolvedValue([otherGroup]);
 
       await expect(service.update(1, { name: 'New name' })).rejects.toThrow(
-        'Group with name New name already exists',
+        'Ya existe un grupo estudiantil con el nombre «New name».',
       );
 
       expect(repository.save).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when updating a non-existing group', async () => {
-      vi.spyOn(repository, 'findOneBy').mockResolvedValue(null);
+      vi.spyOn(repository, 'find').mockResolvedValue([]);
       vi.spyOn(repository, 'preload').mockResolvedValue(undefined);
 
       await expect(service.update(999, { name: 'New name' })).rejects.toThrow(

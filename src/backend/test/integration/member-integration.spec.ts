@@ -90,7 +90,7 @@ describe('Members integration', () => {
       membersRepository.create({
         idEpik: 1001,
         fullName: 'John Doe',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '1000000001',
         email: 'john.doe@test.com',
         phone: '3000000001',
@@ -135,7 +135,7 @@ describe('Members integration', () => {
         id: member.id,
         idEpik: 1001,
         fullName: 'JOHN DOE',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '1000000001',
         email: 'JOHN.DOE@TEST.COM',
         phone: '3000000001',
@@ -178,7 +178,7 @@ describe('Members integration', () => {
       .send({
         idEpik: 1002,
         fullName: 'Jane Smith',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '1000000002',
         email: 'jane.smith@test.com',
         phone: '3000000002',
@@ -194,13 +194,141 @@ describe('Members integration', () => {
         id: expect.any(Number),
         idEpik: 1002,
         fullName: 'Jane Smith',
-        documentType: 'CC',
+        documentType: 'Cédula de ciudadanía',
         documentNumber: '1000000002',
         email: 'jane.smith@test.com',
         phone: '3000000002',
         program: 'Computer Science',
       }),
     );
+  });
+
+  describe('validation', () => {
+    const validPayload = () => ({
+      idEpik: 1500,
+      fullName: 'Valid Person',
+      documentType: 'Cédula de ciudadanía',
+      documentNumber: '1000001500',
+      email: 'valid.person@test.com',
+      phone: '3000001500',
+      program: 'Computer Science',
+      groupId: group.id,
+      memberStatusId: memberStatus.id,
+    });
+
+    const post = (payload: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post('/api/members')
+        .set('Authorization', `Bearer ${token}`)
+        .send(payload);
+
+    it.each([
+      ['an idEpik of 0', { idEpik: 0 }],
+      ['a negative idEpik', { idEpik: -5 }],
+      ['a decimal idEpik', { idEpik: 10.5 }],
+      ['an email without @', { email: 'not-an-email' }],
+      ['a phone with letters', { phone: '300abc0001' }],
+      ['a whitespace-only name', { fullName: '   ' }],
+      ['a whitespace-only program', { program: '   ' }],
+      ['an unknown document type', { documentType: 'CC' }],
+      ['a document number with dots', { documentNumber: '1.000.001' }],
+      ['a name longer than 255 characters', { fullName: 'x'.repeat(256) }],
+    ])('should reject %s', async (_label, override) => {
+      await post({ ...validPayload(), ...override }).expect(400);
+    });
+
+    it('should explain which field is duplicated', async () => {
+      const response = await post({
+        ...validPayload(),
+        email: 'JOHN.DOE@test.com',
+      }).expect(409);
+
+      expect(response.body.message).toBe(
+        'Ya existe otro integrante con el mismo correo electrónico.',
+      );
+    });
+
+    it('should reject a status from another group without leaving an orphan member', async () => {
+      const otherGroup = await groupsRepository.save(
+        groupsRepository.create({ name: 'Other Members Group' }),
+      );
+      const foreignStatus = await memberStatusesRepository.save(
+        memberStatusesRepository.create({
+          name: 'Foreign',
+          target: 10,
+          group: otherGroup,
+        }),
+      );
+
+      await post({
+        ...validPayload(),
+        memberStatusId: foreignStatus.id,
+      }).expect(400);
+
+      expect(await membersRepository.findOneBy({ idEpik: 1500 })).toBeNull();
+    });
+
+    it('should reject a duplicated field when updating', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/members/${member.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ idEpik: 1002 })
+        .expect(409);
+
+      expect(response.body.message).toBe(
+        'Ya existe otro integrante con el mismo ID EPIK.',
+      );
+    });
+
+    it('should link the same person to a second group instead of duplicating it', async () => {
+      const secondGroup = await groupsRepository.save(
+        groupsRepository.create({ name: 'Second Members Group' }),
+      );
+      const secondStatus = await memberStatusesRepository.save(
+        memberStatusesRepository.create({
+          name: 'Active',
+          target: 50,
+          group: secondGroup,
+        }),
+      );
+
+      const response = await post({
+        idEpik: 1002,
+        fullName: 'Jane Smith',
+        documentType: 'Cédula de ciudadanía',
+        documentNumber: '1000000002',
+        email: 'jane.smith@test.com',
+        phone: '3000000002',
+        program: 'Computer Science',
+        groupId: secondGroup.id,
+        memberStatusId: secondStatus.id,
+      }).expect(201);
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/members?groupId=${secondGroup.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(listed.body.map((item: { id: number }) => item.id)).toEqual([
+        response.body.id,
+      ]);
+      expect(await membersRepository.countBy({ idEpik: 1002 })).toBe(1);
+
+      // Sacarla del segundo grupo no la borra del primero.
+      await request(app.getHttpServer())
+        .delete(`/api/members/${response.body.id}?groupId=${secondGroup.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(await membersRepository.countBy({ idEpik: 1002 })).toBe(1);
+
+      const afterRemoval = await request(app.getHttpServer())
+        .get(`/api/members?groupId=${secondGroup.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(afterRemoval.body).toEqual([]);
+    });
   });
 
   it('should update a member', async () => {
@@ -216,7 +344,8 @@ describe('Members integration', () => {
     expect(response.body).toEqual(
       expect.objectContaining({
         id: member.id,
-        fullName: 'John Updated',
+        // Se devuelve el valor ya normalizado (el nombre se guarda en mayúscula).
+        fullName: 'JOHN UPDATED',
       }),
     );
   });

@@ -253,11 +253,12 @@ src/
 
 ## 7. Notas y limitaciones conocidas
 
-- **`documentType` en el seed**: `member.seed.ts` guarda `'CC'`, mientras que el
-  frontend usa los nombres completos (`'Cédula de ciudadanía'`, …). Los miembros
-  seedeados se ven bien pero el `<select>` de tipo de documento no casará con ese
-  valor hasta que se edite. Alinea el seed con `src/frontend/src/constants/documentTypes.ts`
-  si vas a demostrar esa columna.
+- **Validación de datos**: la API valida rangos, formatos y duplicados y responde
+  400/409 con un mensaje en español que el frontend muestra tal cual. Las reglas
+  están resumidas en [`docs/ai/AGENTS.md`](docs/ai/AGENTS.md) (sección 6).
+- **Puntaje de la hoja general**: suma los puntos generales más los de los comités
+  del integrante, así que puede pasar de 100 si las hojas se configuran con pesos
+  que sumen más de 100 entre todas. Cada hoja por separado está limitada a 100.
 - **Usuario de la junta en la UI**: no hay endpoint para listar/consultar usuarios,
   así que el nombre de la cuenta de junta no se muestra en el panel de grupos.
 - **Sin _scoping_ por grupo para BOARD**: un usuario de junta puede leer/escribir

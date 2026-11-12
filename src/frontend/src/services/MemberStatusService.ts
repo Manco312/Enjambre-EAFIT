@@ -5,7 +5,6 @@ import type { MemberStatusInterface } from '@/interfaces/MemberStatusInterface';
 import type { Nullable } from '@/types/Nullable';
 import type { UpdateMemberStatusDTO } from '@/dtos/UpdateMemberStatusDTO';
 import { ENVIRONMENT } from '@/constants/environment';
-import { clampPercentage } from '@/utils/clampPercentage';
 
 const MEMBER_STATUSES_URL = `${ENVIRONMENT.API_URL}/member-statuses`;
 
@@ -42,7 +41,7 @@ export class MemberStatusService {
     const { data } = await axios.post<MemberStatusInterface>(MEMBER_STATUSES_URL, {
       name: dto.name.trim(),
       groupId: dto.groupId,
-      target: clampPercentage(dto.target),
+      target: dto.target,
     });
     return data;
   }
@@ -54,7 +53,6 @@ export class MemberStatusService {
     const payload: UpdateMemberStatusDTO = {
       ...dto,
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
-      ...(dto.target !== undefined ? { target: clampPercentage(dto.target) } : {}),
     };
     const { data } = await axios.patch<MemberStatusInterface>(
       `${MEMBER_STATUSES_URL}/${id}`,
